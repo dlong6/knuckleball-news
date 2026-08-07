@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Knuckleball News</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Merriweather:wght@400;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="admin.css" />
+  </head>
+  <body class="admin-page">
+    <header class="site-header">
+      <div class="utility-bar">
+        <div class="page-shell utility-inner">
+          <a class="utility-logo" href="index.html" aria-label="Knuckleball News Home">
+            <img src="logo_blue.png" alt="Knuckleball News" />
+          </a>
+          <div class="headline-item">
+            <p class="admin-strap">sup lol</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="masthead page-shell">
+        <a class="brand" href="index.html" aria-label="Knuckleball News Home">
+          <img src="logo_white-removebg-preview.png" alt="Knuckleball News" />
+        </a>
+      </div>
+
+      <nav class="primary-nav">
+        <div class="page-shell nav-inner">
+          <a href="index.html">Home</a>
+          <a href="#" data-open-team-modal="true">Search</a>
+          <a href="mailto:golongathletics@gmail.com">Contact</a>
+          <a class="nav-mini-logo" href="admin.html" aria-label="Knuckleball News Admin Login">
+            <img src="logo_blue.png" alt="Knuckleball News" />
+          </a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="page-shell admin-shell">
+      <section id="config-warning" class="admin-panel admin-alert" hidden>
+        <h1>Backend Setup Required</h1>
+        <p>
+          Fill in your Supabase credentials in <strong>kb-config.js</strong> before using the admin dashboard.
+        </p>
+      </section>
+
+      <section id="login-panel" class="admin-panel" hidden>
+        <h1>Login</h1>
+        <form id="login-form" class="stack-form">
+          <label>
+            Email
+            <input id="login-email" name="email" type="email" required autocomplete="email" />
+          </label>
+          <label>
+            Password
+            <input id="login-password" name="password" type="password" required autocomplete="current-password" />
+          </label>
+          <button type="submit">Sign In</button>
+          <p id="login-error" class="form-error" hidden></p>
+        </form>
+      </section>
+
+      <section id="editor-panel" class="admin-panel" hidden>
+        <div class="editor-head">
+          <h1>Article Manager</h1>
+          <button id="logout-button" type="button" class="secondary-button">Sign Out</button>
+        </div>
+
+        <form id="article-form" class="stack-form">
+          <input id="article-id" name="id" type="hidden" />
+          <div class="grid-two">
+            <label>
+              Title
+              <input id="article-title" name="title" type="text" required />
+            </label>
+            <label>
+              Slug
+              <div class="slug-inline-controls">
+                <input id="article-slug" name="slug" type="text" placeholder="auto-generated-from-title" />
+                <button id="generate-slug-button" type="button" class="slug-generate-button" disabled>
+                  Generate Slug
+                </button>
+              </div>
+            </label>
+          </div>
+
+          <div class="grid-two">
+            <label>
+              Author
+              <input id="article-author" name="author" type="text" placeholder="Devin Long" />
+            </label>
+            <label>
+              Category
+              <select id="article-category" name="category"></select>
+            </label>
+          </div>
+
+          <label id="article-ticker-wrap">
+            Ticker
+            <textarea
+              id="article-ticker"
+              name="ticker_text"
+              rows="2"
+              placeholder="Optional: if set, this value becomes the site ticker when this article is the latest with ticker text"
+            ></textarea>
+          </label>
+
+          <label class="checkbox-field">
+            <input id="article-is-series" name="is_series" type="checkbox" />
+            <span>Series</span>
+          </label>
+
+          <div class="grid-two">
+            <label>
+              Status
+              <select id="article-status" name="status">
+                <option value="draft">Draft</option>
+                <option value="published" selected>Published</option>
+              </select>
+            </label>
+            <label>
+              Publish Time
+              <input id="article-published-at" name="published_at" type="datetime-local" />
+            </label>
+          </div>
+
+          <div class="editor-wrap" aria-label="Article Body Editor">
+            <p class="editor-label">Article Body</p>
+            <div id="editor-toolbar" class="editor-toolbar" role="toolbar" aria-label="Text formatting">
+              <button type="button" data-editor-action="bold">Bold</button>
+              <button type="button" data-editor-action="italic">Italic</button>
+              <button type="button" data-editor-action="underline">Underline</button>
+              <button type="button" data-editor-action="strike">Strikethrough</button>
+              <button type="button" data-editor-action="link">Add Link</button>
+              <button type="button" data-editor-action="image">Add Photo</button>
+              <button type="button" data-editor-action="table">Add Table</button>
+              <button type="button" data-editor-action="table-row-add">Add Row</button>
+              <button type="button" data-editor-action="table-col-add">Add Column</button>
+              <button type="button" data-editor-action="table-header-row-add">Add Header Row</button>
+              <button type="button" data-editor-action="table-row-delete">Delete Row</button>
+              <button type="button" data-editor-action="table-col-delete">Delete Column</button>
+              <button type="button" data-editor-action="table-header-row-delete">Delete Header Row</button>
+            </div>
+            <div
+              id="article-body-editor"
+              class="editor-surface"
+              contenteditable="true"
+              role="textbox"
+              aria-multiline="true"
+              data-placeholder="Write your article here"
+            ></div>
+            <textarea id="article-body" name="body_html" hidden></textarea>
+          </div>
+          <p class="editor-help" id="editor-help">
+            Use the toolbar to format text, add links or photos, and insert or edit tables.
+          </p>
+
+          <label>
+            Teams
+            <input id="article-teams" name="teams" type="hidden" />
+            <div id="article-teams-selector" class="team-selector-grid" role="group" aria-label="Select teams"></div>
+          </label>
+
+          <div class="form-actions">
+            <button type="submit">Save Article</button>
+            <button id="new-article-button" type="button" class="secondary-button">New Article</button>
+          </div>
+          <p id="save-status" class="form-success" hidden></p>
+          <p id="save-error" class="form-error" hidden></p>
+        </form>
+
+        <section class="admin-subpanel">
+          <h2>Existing Articles</h2>
+          <label class="list-search-wrap" for="article-list-search">
+            Search Articles
+            <input id="article-list-search" type="search" placeholder="Search by title, author, category, or status" />
+          </label>
+          <ul id="article-list" class="article-list"></ul>
+          <section class="admin-ad-slot" aria-label="Partner advertisement">
+            <div class="partner-ad-layout">
+              <img class="admin-ad-logo" src="GLA_logo copy.png" alt="GoLong Athletics" />
+              <div class="partner-ad-copy">
+                <p class="partner-ad-line">QB and Pitcher Training</p>
+                <p class="partner-ad-line">
+                  <a href="https://golongathletics.com" target="_blank" rel="noopener noreferrer">golongathletics.com</a>
+                </p>
+              </div>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="table-builder-dialog" class="admin-dialog" aria-labelledby="table-builder-title">
+      <form id="table-builder-form" class="table-builder-form" method="dialog">
+        <h2 id="table-builder-title">Insert Table</h2>
+        <p>Set your table size. Include at least one body row.</p>
+        <div class="grid-two">
+          <label>
+            Rows (including header)
+            <input id="table-builder-rows" name="rows" type="number" min="2" max="30" value="4" required />
+          </label>
+          <label>
+            Columns
+            <input id="table-builder-cols" name="cols" type="number" min="1" max="20" value="4" required />
+          </label>
+        </div>
+        <p id="table-builder-error" class="form-error" hidden></p>
+        <div class="form-actions">
+          <button type="button" id="table-builder-cancel" class="secondary-button">Cancel</button>
+          <button type="submit" id="table-builder-submit">Insert Table</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="delete-article-dialog" class="admin-dialog" aria-labelledby="delete-article-title">
+      <form id="delete-article-form" class="table-builder-form" method="dialog">
+        <h2 id="delete-article-title">Delete Article</h2>
+        <p id="delete-article-message">Are you sure you want to delete this article?</p>
+        <div class="form-actions">
+          <button type="button" id="delete-article-cancel" class="secondary-button">Cancel</button>
+          <button type="submit" id="delete-article-confirm" class="danger-button">Delete</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="kb-config.js"></script>
+    <script src="kb-data.js"></script>
+    <script src="teams-nav.js"></script>
+    <script src="admin.js"></script>
+  </body>
+</html>
