@@ -1,8 +1,9 @@
 (function () {
   const SIDEBAR_LINK_LIMIT = 12;
-  const INITIAL_VISIBLE_COUNT = 3;
+  const DESKTOP_INITIAL_VISIBLE_COUNT = 3;
+  const MOBILE_INITIAL_VISIBLE_COUNT = 8;
   const AUTO_PAGE_SIZE = 3;
-  const MAX_MAIN_FEED_ARTICLES = 12;
+  const MOBILE_BREAKPOINT = 760;
   const CATEGORY_LABELS = {
     Eephus: "tag-eephus",
     Wormburner: "tag-wormburner",
@@ -17,10 +18,14 @@
 
   let allPublishedArticles = [];
   let activeArticles = [];
-  let visibleCount = INITIAL_VISIBLE_COUNT;
+  let visibleCount = DESKTOP_INITIAL_VISIBLE_COUNT;
   let autoPagerSentinel = null;
   let autoPagerObserver = null;
   let isAutoPaging = false;
+
+  const isMobileViewport = () => window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
+  const getInitialVisibleCount = () =>
+    isMobileViewport() ? MOBILE_INITIAL_VISIBLE_COUNT : DESKTOP_INITIAL_VISIBLE_COUNT;
 
   const getSortableTimestamp = (article) => {
     const timestamp = Date.parse(article.published_at || article.created_at || "");
@@ -456,6 +461,49 @@
     enableAllTableTools(mainFeed);
   };
 
+  const renderMobileArticleCollection = (articles) => {
+    if (!mainFeed) {
+      return;
+    }
+
+    mainFeed.innerHTML = "";
+
+    if (!articles.length) {
+      const hasSearchQuery = Boolean(searchInput?.value?.trim());
+      const emptyHeading = hasSearchQuery
+        ? "No articles matched your search."
+        : "No published articles yet.";
+      const empty = document.createElement("article");
+      empty.className = "post-card";
+      empty.innerHTML = `<p class='post-kicker'>No Results</p><h2>${emptyHeading}</h2>`;
+      mainFeed.appendChild(empty);
+      return;
+    }
+
+    const list = document.createElement("ol");
+    list.className = "mobile-latest-list";
+
+    articles.forEach((article) => {
+      const item = document.createElement("li");
+      item.className = "mobile-latest-item";
+
+      const title = document.createElement("a");
+      title.className = "mobile-latest-link";
+      title.href = createArticleUrl(article);
+      title.textContent = article.title;
+
+      const meta = document.createElement("p");
+      meta.className = "mobile-latest-meta";
+      meta.textContent = `${window.KBData.formatDate(article.published_at)} | ${article.author || "Knuckleball News"}`;
+
+      item.appendChild(title);
+      item.appendChild(meta);
+      list.appendChild(item);
+    });
+
+    mainFeed.appendChild(list);
+  };
+
   const ensureAutoPager = () => {
     if (!mainFeed || autoPagerSentinel) {
       return;
@@ -477,13 +525,13 @@
           return;
         }
 
-        const cappedTotal = Math.min(activeArticles.length, MAX_MAIN_FEED_ARTICLES);
-        if (visibleCount >= cappedTotal) {
+        const total = activeArticles.length;
+        if (visibleCount >= total) {
           return;
         }
 
         isAutoPaging = true;
-        visibleCount = Math.min(visibleCount + AUTO_PAGE_SIZE, cappedTotal);
+        visibleCount = Math.min(visibleCount + AUTO_PAGE_SIZE, total);
         renderCurrentPage();
         window.requestAnimationFrame(() => {
           isAutoPaging = false;
@@ -504,21 +552,25 @@
       return;
     }
 
-    const cappedTotal = Math.min(activeArticles.length, MAX_MAIN_FEED_ARTICLES);
-    autoPagerSentinel.hidden = !activeArticles.length || visibleCount >= cappedTotal;
+    const total = activeArticles.length;
+    autoPagerSentinel.hidden = !activeArticles.length || visibleCount >= total;
   };
 
   const renderCurrentPage = () => {
-    const total = Math.min(activeArticles.length, MAX_MAIN_FEED_ARTICLES);
+    const total = activeArticles.length;
     const pageItems = activeArticles.slice(0, Math.min(visibleCount, total));
-    renderArticleCollection(pageItems);
+    if (isMobileViewport()) {
+      renderMobileArticleCollection(pageItems);
+    } else {
+      renderArticleCollection(pageItems);
+    }
     syncAutoPagerState();
   };
 
   const setActiveArticles = (articles, resetVisible = true) => {
     activeArticles = articles;
     if (resetVisible) {
-      visibleCount = INITIAL_VISIBLE_COUNT;
+      visibleCount = getInitialVisibleCount();
     }
     renderCurrentPage();
   };
@@ -728,7 +780,116 @@
     });
   };
 
+  const normalizePostBodyTypography = (root = document) => {
+    Array.from(root.querySelectorAll(".post-body")).forEach((body) => {
+      // Strip legacy presentational attributes that can override site typography.
+      body.querySelectorAll("*").forEach((node) => {
+        if (!(node instanceof HTMLElement)) {
+          return;
+        }
+
+        node.removeAttribute("style");
+        node.removeAttribute("align");
+        node.removeAttribute("face");
+        node.removeAttribute("size");
+        node.removeAttribute("color");
+      });
+
+      // Unwrap purely presentational inline wrappers.
+      body.querySelectorAll("font, span").forEach((node) => {
+        if (!(node instanceof HTMLElement)) {
+          return;
+        }
+
+        while (node.firstChild) {
+          node.parentNode?.insertBefore(node.firstChild, node);
+        }
+        node.remove();
+      });
+
+      const isJunkWrapper = (node) => {
+        if (!(node instanceof HTMLElement)) {
+          return false;
+        }
+
+        if (!node.matches("div, p, span")) {
+          return false;
+        }
+
+        if (node.querySelector("img, picture, video, iframe, table, ul, ol, blockquote, h1, h2, h3, h4, h5, h6")) {
+          return false;
+        }
+
+        const cleaned = (node.innerHTML || "")
+          .replace(/<br\s*\/?>/gi, "")
+          .replace(/&nbsp;/gi, "")
+          .replace(/[\s\u200b\u200c\u200d\ufeff]/g, "");
+
+        return cleaned.length === 0;
+      };
+
+      while (body.firstChild && (body.firstChild.nodeType === Node.TEXT_NODE && !(body.firstChild.textContent || "").trim())) {
+        body.firstChild.remove();
+      }
+
+      while (body.lastChild && (body.lastChild.nodeType === Node.TEXT_NODE && !(body.lastChild.textContent || "").trim())) {
+        body.lastChild.remove();
+      }
+
+      while (isJunkWrapper(body.firstElementChild)) {
+        body.firstElementChild.remove();
+      }
+
+      while (isJunkWrapper(body.lastElementChild)) {
+        body.lastElementChild.remove();
+      }
+
+      Array.from(body.querySelectorAll(":scope > div")).forEach((node) => {
+        if (isJunkWrapper(node)) {
+          node.remove();
+          return;
+        }
+
+        const hasBlockChildren = Boolean(
+          node.querySelector("p, div, ul, ol, table, blockquote, h1, h2, h3, h4, h5, h6")
+        );
+        if (!hasBlockChildren) {
+          const paragraph = document.createElement("p");
+          paragraph.innerHTML = node.innerHTML;
+          node.replaceWith(paragraph);
+        }
+      });
+
+      Array.from(body.querySelectorAll(":scope > br")).forEach((node) => {
+        node.remove();
+      });
+
+      const firstNode = body.firstChild;
+      if (firstNode && firstNode.nodeType === Node.TEXT_NODE) {
+        const text = (firstNode.textContent || "").trim();
+        if (text) {
+          const paragraph = document.createElement("p");
+          paragraph.textContent = text;
+          firstNode.replaceWith(paragraph);
+        }
+      }
+
+      while (body.firstElementChild && body.firstElementChild.tagName === "BR") {
+        body.firstElementChild.remove();
+      }
+
+      while (body.lastElementChild && body.lastElementChild.tagName === "BR") {
+        body.lastElementChild.remove();
+      }
+
+      body.querySelectorAll("[data-wormburner-ticker='true']").forEach((node) => {
+        node.remove();
+      });
+    });
+  };
+
   const enableAllTableTools = (root = document) => {
+    normalizePostBodyTypography(root);
     normalizeArticleTables(root);
     normalizePostBodyLinks(root);
     Array.from(root.querySelectorAll(".stats-table")).forEach((table) => {
@@ -758,6 +919,17 @@
   const setupPage = async () => {
     bindSearch();
     bindInstagramShare();
+
+    const mobileQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
+    const rerenderForViewport = () => {
+      renderCurrentPage();
+    };
+
+    if (typeof mobileQuery.addEventListener === "function") {
+      mobileQuery.addEventListener("change", rerenderForViewport);
+    } else if (typeof mobileQuery.addListener === "function") {
+      mobileQuery.addListener(rerenderForViewport);
+    }
 
     if (!window.KBData.hasSupabaseConfig) {
       setupFallbackHomepage();

@@ -1,5 +1,6 @@
 (function () {
 	const SIDEBAR_LINK_LIMIT = 12;
+	const MOBILE_BREAKPOINT = 760;
 	const CATEGORY_LABELS = {
 		Eephus: "tag-eephus",
 		Wormburner: "tag-wormburner",
@@ -18,6 +19,15 @@
 
 	const sortArticlesNewestFirst = (articles) =>
 		[...articles].sort((left, right) => getSortableTimestamp(right) - getSortableTimestamp(left));
+
+	const getNextArticle = (articles, currentSlug) => {
+		const index = articles.findIndex((article) => article.slug === currentSlug);
+		if (index === -1) {
+			return null;
+		}
+
+		return articles[index + 1] || null;
+	};
 
 	const createTag = (text, className) => {
 		const tag = document.createElement("span");
@@ -312,7 +322,118 @@
 		});
 	};
 
-	const renderArticle = (article) => {
+	const normalizePostBodyTypography = (root = document) => {
+		const body = root.querySelector(".post-body");
+		if (!body) {
+			return;
+		}
+
+		// Strip legacy presentational attributes that can override site typography.
+		body.querySelectorAll("*").forEach((node) => {
+			if (!(node instanceof HTMLElement)) {
+				return;
+			}
+
+			node.removeAttribute("style");
+			node.removeAttribute("align");
+			node.removeAttribute("face");
+			node.removeAttribute("size");
+			node.removeAttribute("color");
+		});
+
+		// Unwrap purely presentational inline wrappers.
+		body.querySelectorAll("font, span").forEach((node) => {
+			if (!(node instanceof HTMLElement)) {
+				return;
+			}
+
+			while (node.firstChild) {
+				node.parentNode?.insertBefore(node.firstChild, node);
+			}
+			node.remove();
+		});
+
+		const isJunkWrapper = (node) => {
+			if (!(node instanceof HTMLElement)) {
+				return false;
+			}
+
+			if (!node.matches("div, p, span")) {
+				return false;
+			}
+
+			if (node.querySelector("img, picture, video, iframe, table, ul, ol, blockquote, h1, h2, h3, h4, h5, h6")) {
+				return false;
+			}
+
+			const cleaned = (node.innerHTML || "")
+				.replace(/<br\s*\/?>/gi, "")
+				.replace(/&nbsp;/gi, "")
+				.replace(/[\s\u200b\u200c\u200d\ufeff]/g, "");
+
+			return cleaned.length === 0;
+		};
+
+		while (body.firstChild && (body.firstChild.nodeType === Node.TEXT_NODE && !(body.firstChild.textContent || "").trim())) {
+			body.firstChild.remove();
+		}
+
+		while (body.lastChild && (body.lastChild.nodeType === Node.TEXT_NODE && !(body.lastChild.textContent || "").trim())) {
+			body.lastChild.remove();
+		}
+
+		while (isJunkWrapper(body.firstElementChild)) {
+			body.firstElementChild.remove();
+		}
+
+		while (isJunkWrapper(body.lastElementChild)) {
+			body.lastElementChild.remove();
+		}
+
+		Array.from(body.querySelectorAll(":scope > div")).forEach((node) => {
+			if (isJunkWrapper(node)) {
+				node.remove();
+				return;
+			}
+
+			const hasBlockChildren = Boolean(
+				node.querySelector("p, div, ul, ol, table, blockquote, h1, h2, h3, h4, h5, h6")
+			);
+			if (!hasBlockChildren) {
+				const paragraph = document.createElement("p");
+				paragraph.innerHTML = node.innerHTML;
+				node.replaceWith(paragraph);
+			}
+		});
+
+		Array.from(body.querySelectorAll(":scope > br")).forEach((node) => {
+			node.remove();
+		});
+
+		const firstNode = body.firstChild;
+		if (firstNode && firstNode.nodeType === Node.TEXT_NODE) {
+			const text = (firstNode.textContent || "").trim();
+			if (text) {
+				const paragraph = document.createElement("p");
+				paragraph.textContent = text;
+				firstNode.replaceWith(paragraph);
+			}
+		}
+
+		while (body.firstElementChild && body.firstElementChild.tagName === "BR") {
+			body.firstElementChild.remove();
+		}
+
+		while (body.lastElementChild && body.lastElementChild.tagName === "BR") {
+			body.lastElementChild.remove();
+		}
+
+		body.querySelectorAll(`[data-wormburner-ticker="true"]`).forEach((node) => {
+			node.remove();
+		});
+	};
+
+	const renderArticle = (article, nextArticle) => {
 		if (!articleView) {
 			return;
 		}
@@ -378,7 +499,22 @@
 		articleView.appendChild(body);
 		articleView.appendChild(createShareActions(article));
 		articleView.appendChild(createTeamLabelsSection(teams));
+
+		if (nextArticle) {
+			const nextWrap = document.createElement("div");
+			nextWrap.className = "load-next-article-wrap";
+
+			const nextButton = document.createElement("a");
+			nextButton.className = "load-next-article-button";
+			nextButton.href = createArticleUrl(nextArticle);
+			nextButton.textContent = "Load Next Article";
+
+			nextWrap.appendChild(nextButton);
+			articleView.appendChild(nextWrap);
+		}
+
 		normalizeArticleTables(articleView);
+		normalizePostBodyTypography(articleView);
 		normalizePostBodyLinks(articleView);
 
 		document.title = `${article.title} | Knuckleball News`;
@@ -408,7 +544,8 @@
 				return;
 			}
 
-			renderArticle(article);
+			const nextArticle = getNextArticle(sortedArticles, slug);
+			renderArticle(article, nextArticle);
 		} catch (error) {
 			console.error("Unable to load article", error);
 			renderNotFound();

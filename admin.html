@@ -46,24 +46,24 @@
 
     <main class="page-shell admin-shell">
       <section id="config-warning" class="admin-panel admin-alert" hidden>
-        <h1>Backend Setup Required</h1>
-        <p>
-          Fill in your Supabase credentials in <strong>kb-config.js</strong> before using the admin dashboard.
-        </p>
+        <h1>Admin Setup Required</h1>
+        <p>Add your Supabase credentials in kb-config.js to use the article manager.</p>
       </section>
 
       <section id="login-panel" class="admin-panel" hidden>
-        <h1>Login</h1>
+        <h1>Admin Login</h1>
         <form id="login-form" class="stack-form">
           <label>
             Email
-            <input id="login-email" name="email" type="email" required autocomplete="email" />
+            <input id="login-email" type="email" required />
           </label>
           <label>
             Password
-            <input id="login-password" name="password" type="password" required autocomplete="current-password" />
+            <input id="login-password" type="password" required />
           </label>
-          <button type="submit">Sign In</button>
+          <div class="form-actions">
+            <button type="submit">Sign In</button>
+          </div>
           <p id="login-error" class="form-error" hidden></p>
         </form>
       </section>
@@ -71,113 +71,162 @@
       <section id="editor-panel" class="admin-panel" hidden>
         <div class="editor-head">
           <h1>Article Manager</h1>
-          <button id="logout-button" type="button" class="secondary-button">Sign Out</button>
+          <button id="logout-button" type="button" class="secondary-button">Log Out</button>
         </div>
 
-        <form id="article-form" class="stack-form">
-          <input id="article-id" name="id" type="hidden" />
-          <div class="grid-two">
-            <label>
-              Title
-              <input id="article-title" name="title" type="text" required />
-            </label>
-            <label>
-              Slug
-              <div class="slug-inline-controls">
-                <input id="article-slug" name="slug" type="text" placeholder="auto-generated-from-title" />
-                <button id="generate-slug-button" type="button" class="slug-generate-button" disabled>
-                  Generate Slug
-                </button>
-              </div>
-            </label>
+        <section class="admin-subpanel manager-actions-panel">
+          <h2>Quick Actions</h2>
+          <div class="manager-actions">
+            <button id="create-article-view-button" type="button" class="manager-action-button">Create New Article</button>
+            <button id="update-headline-view-button" type="button" class="manager-action-button">Update Headline</button>
           </div>
+        </section>
 
-          <div class="grid-two">
-            <label>
-              Author
-              <input id="article-author" name="author" type="text" placeholder="Devin Long" />
-            </label>
-            <label>
-              Category
-              <select id="article-category" name="category"></select>
-            </label>
+        <section id="article-editor-panel" class="admin-subpanel" hidden>
+          <div class="subpanel-head">
+            <h2>Create or Edit Article</h2>
+            <button id="close-article-editor-button" type="button" class="editor-close-button" aria-label="Close article editor">
+              x
+            </button>
           </div>
+          <form id="article-form" class="stack-form">
+            <input id="article-id" name="id" type="hidden" />
 
-          <label id="article-ticker-wrap">
-            Ticker
-            <textarea
-              id="article-ticker"
-              name="ticker_text"
-              rows="2"
-              placeholder="Optional: if set, this value becomes the site ticker when this article is the latest with ticker text"
-            ></textarea>
-          </label>
-
-          <label class="checkbox-field">
-            <input id="article-is-series" name="is_series" type="checkbox" />
-            <span>Series</span>
-          </label>
-
-          <div class="grid-two">
-            <label>
-              Status
-              <select id="article-status" name="status">
-                <option value="draft">Draft</option>
-                <option value="published" selected>Published</option>
-              </select>
-            </label>
-            <label>
-              Publish Time
-              <input id="article-published-at" name="published_at" type="datetime-local" />
-            </label>
-          </div>
-
-          <div class="editor-wrap" aria-label="Article Body Editor">
-            <p class="editor-label">Article Body</p>
-            <div id="editor-toolbar" class="editor-toolbar" role="toolbar" aria-label="Text formatting">
-              <button type="button" data-editor-action="bold">Bold</button>
-              <button type="button" data-editor-action="italic">Italic</button>
-              <button type="button" data-editor-action="underline">Underline</button>
-              <button type="button" data-editor-action="strike">Strikethrough</button>
-              <button type="button" data-editor-action="link">Add Link</button>
-              <button type="button" data-editor-action="image">Add Photo</button>
-              <button type="button" data-editor-action="table">Add Table</button>
-              <button type="button" data-editor-action="table-row-add">Add Row</button>
-              <button type="button" data-editor-action="table-col-add">Add Column</button>
-              <button type="button" data-editor-action="table-header-row-add">Add Header Row</button>
-              <button type="button" data-editor-action="table-row-delete">Delete Row</button>
-              <button type="button" data-editor-action="table-col-delete">Delete Column</button>
-              <button type="button" data-editor-action="table-header-row-delete">Delete Header Row</button>
+            <div class="grid-two">
+              <label>
+                Title
+                <input id="article-title" name="title" type="text" required />
+              </label>
+              <label>
+                <span class="slug-label-row">
+                  <span>Slug</span>
+                  <button id="generate-slug-button" type="button" class="slug-generate-button" disabled>
+                    Generate Slug
+                  </button>
+                </span>
+                <div class="slug-inline-controls">
+                  <input id="article-slug" name="slug" type="text" placeholder="auto-generated-from-title" />
+                </div>
+              </label>
             </div>
-            <div
-              id="article-body-editor"
-              class="editor-surface"
-              contenteditable="true"
-              role="textbox"
-              aria-multiline="true"
-              data-placeholder="Write your article here"
-            ></div>
-            <textarea id="article-body" name="body_html" hidden></textarea>
+
+            <div class="grid-two">
+              <label>
+                Author
+                <input id="article-author" name="author" type="text" placeholder="Devin Long" />
+              </label>
+              <label>
+                Category
+                <select id="article-category" name="category"></select>
+              </label>
+            </div>
+
+            <label class="checkbox-field">
+              <input id="article-is-series" name="is_series" type="checkbox" />
+              <span>Series</span>
+            </label>
+
+            <div class="grid-two">
+              <label>
+                Status
+                <select id="article-status" name="status">
+                  <option value="draft">Draft</option>
+                  <option value="published" selected>Published</option>
+                </select>
+              </label>
+              <label>
+                Publish Time
+                <input id="article-published-at" name="published_at" type="datetime-local" />
+              </label>
+            </div>
+
+            <div class="editor-wrap" aria-label="Article Body Editor">
+              <p class="editor-label">Article Body</p>
+              <div id="editor-toolbar" class="editor-toolbar" role="toolbar" aria-label="Text formatting">
+                <div class="toolbar-section" aria-label="Format">
+                  <p class="toolbar-section-title">Format</p>
+                  <div class="toolbar-section-actions">
+                    <button type="button" data-editor-action="bold">Bold</button>
+                    <button type="button" data-editor-action="italic">Italic</button>
+                    <button type="button" data-editor-action="underline">Underline</button>
+                    <button type="button" data-editor-action="strike">Strikethrough</button>
+                  </div>
+                </div>
+                <div class="toolbar-section" aria-label="Media">
+                  <p class="toolbar-section-title">Media</p>
+                  <div class="toolbar-section-actions">
+                    <button type="button" data-editor-action="link">Link</button>
+                    <button type="button" data-editor-action="image">Photo</button>
+                  </div>
+                </div>
+                <div class="toolbar-section" aria-label="Table">
+                  <p class="toolbar-section-title">Table</p>
+                  <div class="toolbar-section-actions">
+                    <button type="button" data-editor-action="table">Add Table</button>
+                    <button type="button" data-editor-action="table-row-add">Add Row</button>
+                    <button type="button" data-editor-action="table-col-add">Add Column</button>
+                    <button type="button" data-editor-action="table-header-row-add">Add Header Row</button>
+                    <button type="button" data-editor-action="table-row-delete">Delete Row</button>
+                    <button type="button" data-editor-action="table-col-delete">Delete Column</button>
+                    <button type="button" data-editor-action="table-header-row-delete">Delete Header Row</button>
+                  </div>
+                </div>
+              </div>
+              <div
+                id="article-body-editor"
+                class="editor-surface"
+                contenteditable="true"
+                role="textbox"
+                aria-multiline="true"
+                data-placeholder="Write your article here"
+              ></div>
+              <textarea id="article-body" name="body_html" hidden></textarea>
+            </div>
+            <p class="editor-help" id="editor-help">
+              Use the toolbar to format text, add links or photos, and insert or edit tables.
+            </p>
+
+            <label>
+              Teams
+              <input id="article-teams" name="teams" type="hidden" />
+              <div id="article-teams-selector" class="team-selector-grid" role="group" aria-label="Select teams"></div>
+            </label>
+
+            <div class="form-actions">
+              <button type="submit">Save Article</button>
+              <button id="new-article-button" type="button" class="secondary-button">Clear Form</button>
+            </div>
+            <p id="save-status" class="form-success" hidden></p>
+            <p id="save-error" class="form-error" hidden></p>
+          </form>
+        </section>
+
+        <section id="headline-editor-panel" class="admin-subpanel" hidden>
+          <div class="subpanel-head">
+            <h2>Update Headline</h2>
+            <button id="close-headline-editor-button" type="button" class="editor-close-button" aria-label="Close headline editor">
+              x
+            </button>
           </div>
-          <p class="editor-help" id="editor-help">
-            Use the toolbar to format text, add links or photos, and insert or edit tables.
-          </p>
+          <form id="headline-form" class="stack-form">
+            <label>
+              Ticker Headline
+              <textarea
+                id="headline-text"
+                name="headline_text"
+                rows="3"
+                placeholder="Enter the headline shown in the top ticker"
+              ></textarea>
+            </label>
+            <div class="form-actions">
+              <button type="submit">Save Headline</button>
+            </div>
+            <p id="headline-status" class="form-success" hidden></p>
+            <p id="headline-error" class="form-error" hidden></p>
+          </form>
+        </section>
 
-          <label>
-            Teams
-            <input id="article-teams" name="teams" type="hidden" />
-            <div id="article-teams-selector" class="team-selector-grid" role="group" aria-label="Select teams"></div>
-          </label>
-
-          <div class="form-actions">
-            <button type="submit">Save Article</button>
-            <button id="new-article-button" type="button" class="secondary-button">New Article</button>
-          </div>
-          <p id="save-status" class="form-success" hidden></p>
-          <p id="save-error" class="form-error" hidden></p>
-        </form>
-
-        <section class="admin-subpanel">
+        <section class="admin-subpanel manager-top-panel">
           <h2>Existing Articles</h2>
           <label class="list-search-wrap" for="article-list-search">
             Search Articles
@@ -196,6 +245,7 @@
             </div>
           </section>
         </section>
+
       </section>
     </main>
 
@@ -231,6 +281,21 @@
         </div>
       </form>
     </dialog>
+
+    <dialog id="action-confirm-dialog" class="admin-dialog" aria-labelledby="action-confirm-title">
+      <form id="action-confirm-form" class="table-builder-form" method="dialog">
+        <h2 id="action-confirm-title">Are you sure?</h2>
+        <p id="action-confirm-message">Confirm this action.</p>
+        <div class="form-actions">
+          <button type="button" id="action-confirm-cancel" class="secondary-button">Cancel</button>
+          <button type="submit" id="action-confirm-submit" class="danger-button">Confirm</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="save-toast" class="save-toast" role="status" aria-live="polite" hidden>
+      Article saved
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="kb-config.js"></script>

@@ -47,6 +47,7 @@
     window.supabase &&
     window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
   const LOCAL_ARTICLES_CACHE_KEY = "knuckleball.cachedArticles.v1";
+    const LOCAL_TICKER_HEADLINE_KEY = "knuckleball.tickerHeadline.v1";
 
   const splitList = (value) =>
     String(value || "")
@@ -204,6 +205,22 @@
     writeCachedArticles(next);
   };
 
+    const readLocalTickerHeadline = () => {
+      try {
+        return String(window.localStorage.getItem(LOCAL_TICKER_HEADLINE_KEY) || "").trim();
+      } catch (_error) {
+        return "";
+      }
+    };
+
+    const writeLocalTickerHeadline = (value) => {
+      try {
+        window.localStorage.setItem(LOCAL_TICKER_HEADLINE_KEY, String(value || "").trim());
+      } catch (_error) {
+        // Ignore storage failures.
+      }
+    };
+
   const getCachedPublishedArticles = () =>
     sortByNewest(readCachedArticles().filter((article) => article.status === "published"));
 
@@ -323,6 +340,68 @@
     allArticles.forEach(upsertCachedArticle);
     return allArticles;
   };
+
+    const fetchTickerHeadline = async () => {
+      const localFallback = readLocalTickerHeadline();
+      if (!supabaseClient) {
+        return localFallback;
+      }
+
+      try {
+        const { data, error } = await supabaseClient
+          .from("site_settings")
+          .select("value")
+          .eq("key", "ticker_headline")
+          .maybeSingle();
+
+        if (error) {
+          return localFallback;
+        }
+
+        const remoteValue = String(data?.value || "").trim();
+        if (remoteValue) {
+          writeLocalTickerHeadline(remoteValue);
+        }
+
+        return remoteValue || localFallback;
+      } catch (_error) {
+        return localFallback;
+      }
+    };
+
+    const saveTickerHeadline = async (headlineText) => {
+      const normalized = String(headlineText || "").trim();
+      writeLocalTickerHeadline(normalized);
+
+      if (!supabaseClient) {
+        return { headline: normalized, scope: "local" };
+      }
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabaseClient.auth.getSession();
+      if (sessionError) {
+        throw sessionError;
+      }
+      if (!session) {
+        throw new Error("You are signed out. Please sign in again.");
+      }
+
+      try {
+        const { error } = await supabaseClient
+          .from("site_settings")
+          .upsert({ key: "ticker_headline", value: normalized }, { onConflict: "key" });
+
+        if (error) {
+          return { headline: normalized, scope: "local" };
+        }
+
+        return { headline: normalized, scope: "remote" };
+      } catch (_error) {
+        return { headline: normalized, scope: "local" };
+      }
+    };
 
   const saveArticle = async (articleInput) => {
     if (!supabaseClient) {
@@ -461,6 +540,8 @@
     fetchPublishedArticles,
     fetchPublishedArticleBySlug,
     fetchAllArticles,
+    fetchTickerHeadline,
+    saveTickerHeadline,
     saveArticle,
     deleteArticle,
     signIn,

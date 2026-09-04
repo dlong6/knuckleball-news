@@ -83,10 +83,14 @@
 }
 
 .slug-inline-controls {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.45rem;
+  display: block;
+}
+
+.slug-label-row {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
 }
 
 .stack-form .slug-generate-button {
@@ -140,8 +144,30 @@
   resize: vertical;
 }
 
-#article-ticker-wrap textarea {
-  min-height: 72px;
+.manager-top-panel {
+  margin-top: 0.9rem;
+}
+
+.manager-actions-panel {
+  margin-top: 0.9rem;
+  background: #f5f8fc;
+}
+
+.manager-actions {
+  margin: 0;
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.manager-actions .manager-action-button {
+  min-height: 46px;
+  padding: 0.85rem 1.1rem;
+  font-size: 0.82rem;
+}
+
+#headline-text {
+  min-height: 84px;
 }
 
 .editor-wrap {
@@ -158,14 +184,79 @@
 }
 
 .editor-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 0.7fr) minmax(0, 2.45fr);
+  border: 1px solid #d9e1ea;
+  background: #f8fbff;
+}
+
+.toolbar-section {
+  padding: 0.5rem 0.55rem 0.55rem;
+}
+
+.toolbar-section + .toolbar-section {
+  border-left: 1px solid #e4ebf3;
+}
+
+.toolbar-section-title {
+  margin: 0 0 0.42rem;
+  color: #617488;
+  font: 600 0.62rem/1.2 "Libre Franklin", "Helvetica Neue", sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.toolbar-section-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
+  gap: 0.35rem;
+}
+
+.toolbar-section[aria-label="Format"],
+.toolbar-section[aria-label="Media"] {
+  padding: 0.42rem 0.45rem 0.45rem;
+}
+
+.toolbar-section[aria-label="Format"] .toolbar-section-actions,
+.toolbar-section[aria-label="Media"] .toolbar-section-actions {
+  gap: 0.28rem;
+}
+
+.toolbar-section[aria-label="Format"] button,
+.toolbar-section[aria-label="Media"] button {
+  padding: 0.42rem 0.52rem;
+  font-size: 0.62rem;
+}
+
+.toolbar-section[aria-label="Table"] .toolbar-section-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.28rem;
+}
+
+.toolbar-section[aria-label="Table"] button {
+  width: 100%;
+  white-space: nowrap;
 }
 
 .editor-toolbar button {
   padding: 0.5rem 0.65rem;
   font-size: 0.66rem;
+}
+
+.save-toast {
+  position: fixed;
+  top: 0.85rem;
+  right: 0.85rem;
+  z-index: 1200;
+  border: 1px solid #3d8356;
+  background: #e9f8ee;
+  color: #1f6138;
+  padding: 0.5rem 0.7rem;
+  font: 700 0.68rem/1 "Libre Franklin", "Helvetica Neue", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 8px 20px rgba(19, 34, 54, 0.16);
 }
 
 .admin-dialog {
@@ -319,6 +410,34 @@ button:hover {
   color: #29415f;
 }
 
+.subpanel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+
+.subpanel-head h2 {
+  margin: 0;
+}
+
+.editor-close-button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #7f90a3;
+  background: #f0f4f9;
+  color: #2a3f57;
+  font: 700 0.84rem/1 "Libre Franklin", "Helvetica Neue", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: normal;
+}
+
+.editor-close-button:hover {
+  background: #dce6f1;
+}
+
 .list-search-wrap {
   display: grid;
   gap: 0.35rem;
@@ -403,6 +522,23 @@ button:hover {
     align-items: flex-start;
   }
 
+  .editor-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar-section + .toolbar-section {
+    border-left: none;
+    border-top: 1px solid #e4ebf3;
+  }
+
+  .toolbar-section[aria-label="Table"] .toolbar-section-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .toolbar-section[aria-label="Table"] button {
+    width: auto;
+  }
+
   .article-list li {
     flex-direction: column;
     align-items: flex-start;
@@ -411,4 +547,5 @@ button:hover {
   .admin-ad-logo {
     width: 80px;
   }
+
 }

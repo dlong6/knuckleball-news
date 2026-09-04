@@ -346,6 +346,45 @@ a:hover {
   height: 1px;
 }
 
+.mobile-latest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--shell-bg);
+}
+
+.mobile-latest-item {
+  margin: 0;
+  padding: 0.95rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.mobile-latest-item:last-child {
+  border-bottom: 0;
+}
+
+.mobile-latest-link {
+  display: block;
+  color: #1c3553;
+  font-size: 1.02rem;
+  line-height: 1.35;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.mobile-latest-link:hover {
+  text-decoration: underline;
+}
+
+.mobile-latest-meta {
+  margin: 0.35rem 0 0;
+  color: #64758a;
+  text-transform: uppercase;
+  letter-spacing: 0.045em;
+  font: 600 0.64rem/1.4 "Libre Franklin", "Helvetica Neue", sans-serif;
+}
+
 .post-card {
   background: var(--shell-bg);
   border: 1px solid var(--line);
@@ -555,15 +594,6 @@ a.tag-chip:hover {
   font-weight: 400;
 }
 
-/* Normalize rich-text article body typography across all posts. */
-.post-body :is(p, div, span, li, blockquote, a) {
-  color: #24364a !important;
-  font-family: "Merriweather", Georgia, serif !important;
-  font-size: 0.96rem !important;
-  line-height: 1.62 !important;
-  font-weight: 400 !important;
-}
-
 .post-body a {
   text-decoration: underline;
 }
@@ -625,6 +655,31 @@ a.tag-chip:hover {
 .post-share-link:hover {
   background: #e2ecf7;
   color: #162e4a;
+  text-decoration: none;
+}
+
+.load-next-article-wrap {
+  display: none;
+}
+
+.load-next-article-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border: 1px solid #264a78;
+  background: #3465a4;
+  color: #eff4fa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font: 700 0.72rem/1 "Libre Franklin", "Helvetica Neue", sans-serif;
+  padding: 0.72rem 0.9rem;
+  text-decoration: none;
+}
+
+.load-next-article-button:hover {
+  background: #294f82;
+  color: #eff4fa;
   text-decoration: none;
 }
 
@@ -939,6 +994,10 @@ a.tag-chip:hover {
 }
 
 @media (max-width: 760px) {
+  .article-links-module {
+    display: none;
+  }
+
   .utility-inner {
     min-height: 64px;
   }
@@ -970,6 +1029,19 @@ a.tag-chip:hover {
     padding: 1.1rem;
   }
 
+  .mobile-latest-item {
+    padding: 0.9rem 0.85rem;
+  }
+
+  .mobile-latest-link {
+    font-size: 0.98rem;
+  }
+
+  .load-next-article-wrap {
+    display: block;
+    margin-top: 1rem;
+  }
+
   .nav-search {
     margin-left: auto;
     position: static;
@@ -988,7 +1060,7 @@ a.tag-chip:hover {
   }
 
   .nav-mini-logo {
-    margin-left: 0;
+    margin-left: auto;
   }
 
   .post-labels {

@@ -10,9 +10,20 @@
   const editorToolbar = document.querySelector("#editor-toolbar");
   const logoutButton = document.querySelector("#logout-button");
   const newArticleButton = document.querySelector("#new-article-button");
+  const createArticleViewButton = document.querySelector("#create-article-view-button");
+  const updateHeadlineViewButton = document.querySelector("#update-headline-view-button");
+  const articleEditorPanel = document.querySelector("#article-editor-panel");
+  const closeArticleEditorButton = document.querySelector("#close-article-editor-button");
+  const headlineEditorPanel = document.querySelector("#headline-editor-panel");
+  const closeHeadlineEditorButton = document.querySelector("#close-headline-editor-button");
+  const headlineForm = document.querySelector("#headline-form");
+  const headlineTextInput = document.querySelector("#headline-text");
+  const headlineStatus = document.querySelector("#headline-status");
+  const headlineError = document.querySelector("#headline-error");
   const generateSlugButton = document.querySelector("#generate-slug-button");
   const saveStatus = document.querySelector("#save-status");
   const saveError = document.querySelector("#save-error");
+  const saveToast = document.querySelector("#save-toast");
   const editorHelp = document.querySelector("#editor-help");
   const tableBuilderDialog = document.querySelector("#table-builder-dialog");
   const tableBuilderForm = document.querySelector("#table-builder-form");
@@ -24,8 +35,13 @@
   const deleteArticleForm = document.querySelector("#delete-article-form");
   const deleteArticleMessage = document.querySelector("#delete-article-message");
   const deleteArticleCancel = document.querySelector("#delete-article-cancel");
+  const actionConfirmDialog = document.querySelector("#action-confirm-dialog");
+  const actionConfirmForm = document.querySelector("#action-confirm-form");
+  const actionConfirmMessage = document.querySelector("#action-confirm-message");
+  const actionConfirmCancel = document.querySelector("#action-confirm-cancel");
+  const actionConfirmSubmit = document.querySelector("#action-confirm-submit");
   const teamsSelector = document.querySelector("#article-teams-selector");
-  const TICKER_ATTR = "data-wormburner-ticker";
+  const LEGACY_TICKER_ATTR = "data-wormburner-ticker";
   const TABLE_EDIT_ACTIONS = new Set([
     "table-row-add",
     "table-col-add",
@@ -41,7 +57,6 @@
     slug: document.querySelector("#article-slug"),
     author: document.querySelector("#article-author"),
     category: document.querySelector("#article-category"),
-    ticker: document.querySelector("#article-ticker"),
     isSeries: document.querySelector("#article-is-series"),
     status: document.querySelector("#article-status"),
     publishedAt: document.querySelector("#article-published-at"),
@@ -54,7 +69,36 @@
   let currentListFilter = "";
   let tableDialogResolver = null;
   let deleteDialogResolver = null;
+  let actionConfirmResolver = null;
   let selectedTeams = new Set();
+  let saveToastTimer = null;
+
+  const flashSaveToast = (message = "Article saved") => {
+    if (!saveToast) {
+      return;
+    }
+
+    if (saveToastTimer) {
+      window.clearTimeout(saveToastTimer);
+    }
+
+    saveToast.textContent = message;
+    saveToast.hidden = false;
+    saveToastTimer = window.setTimeout(() => {
+      saveToast.hidden = true;
+      saveToastTimer = null;
+    }, 1800);
+  };
+
+  const setAdminView = (view) => {
+    if (articleEditorPanel) {
+      articleEditorPanel.hidden = view !== "article";
+    }
+
+    if (headlineEditorPanel) {
+      headlineEditorPanel.hidden = view !== "headline";
+    }
+  };
 
   const setVisibleState = ({ showWarning, showLogin, showEditor }) => {
     configWarning.hidden = !showWarning;
@@ -91,7 +135,6 @@
     field.slug.value = "";
     field.author.value = "";
     field.category.value = "";
-    field.ticker.value = "";
     field.isSeries.checked = false;
     field.status.value = "published";
     field.publishedAt.value = toLocalDateTimeInputValue(new Date().toISOString());
@@ -140,46 +183,16 @@
     generateSlugButton.disabled = !field.title.value.trim();
   };
 
-  const escapeHtml = (value) =>
-    String(value || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/\"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-
-  const createTickerParagraphHtml = (tickerText) =>
-    `<p ${TICKER_ATTR}="true">${escapeHtml(tickerText).replace(/\n/g, "<br />")}</p>`;
-
-  const stripTickerParagraphFromBody = (bodyHtml) => {
+  const stripLegacyTickerParagraphFromBody = (bodyHtml) => {
     const container = document.createElement("div");
     container.innerHTML = String(bodyHtml || "").trim();
 
-    const taggedTicker = container.querySelector(`p[${TICKER_ATTR}="true"]`);
+    const taggedTicker = container.querySelector(`p[${LEGACY_TICKER_ATTR}="true"]`);
     if (taggedTicker) {
       taggedTicker.remove();
     }
 
     return container.innerHTML.trim();
-  };
-
-  const extractTickerFromBody = (bodyHtml) => {
-    const container = document.createElement("div");
-    container.innerHTML = String(bodyHtml || "").trim();
-
-    const taggedTicker = container.querySelector(`p[${TICKER_ATTR}="true"]`);
-    const tickerText = taggedTicker
-      ? (taggedTicker.textContent || "").replace(/\s+/g, " ").trim()
-      : "";
-
-    if (taggedTicker) {
-      taggedTicker.remove();
-    }
-
-    return {
-      tickerText,
-      bodyWithoutTicker: container.innerHTML.trim(),
-    };
   };
 
   const parseTeamsInput = (value) => {
@@ -1001,24 +1014,66 @@
     });
   };
 
+  const requestActionConfirm = (message, confirmLabel = "Confirm") => {
+    if (!actionConfirmDialog || !actionConfirmForm || !actionConfirmMessage || !actionConfirmSubmit) {
+      return Promise.resolve(window.confirm(message));
+    }
+
+    actionConfirmMessage.textContent = message;
+    actionConfirmSubmit.textContent = confirmLabel;
+
+    return new Promise((resolve) => {
+      actionConfirmResolver = resolve;
+      actionConfirmDialog.showModal();
+      window.requestAnimationFrame(() => {
+        actionConfirmCancel?.focus();
+      });
+    });
+  };
+
+  const setupActionConfirmDialog = () => {
+    if (!actionConfirmDialog || !actionConfirmForm) {
+      return;
+    }
+
+    actionConfirmCancel?.addEventListener("click", () => {
+      actionConfirmDialog.close("cancel");
+    });
+
+    actionConfirmForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      actionConfirmDialog.close("confirm");
+    });
+
+    actionConfirmDialog.addEventListener("close", () => {
+      if (!actionConfirmResolver) {
+        return;
+      }
+
+      const resolver = actionConfirmResolver;
+      actionConfirmResolver = null;
+      resolver(actionConfirmDialog.returnValue === "confirm");
+    });
+  };
+
   const fillEditor = (article) => {
     field.id.value = article.id || "";
     field.title.value = article.title || "";
     field.slug.value = article.slug || "";
     field.author.value = article.author || "";
     field.category.value = article.category || "";
-    const tickerData = extractTickerFromBody(article.body_html || "");
-    field.ticker.value = tickerData.tickerText;
+    const normalizedBodyHtml = stripLegacyTickerParagraphFromBody(article.body_html || "");
     field.isSeries.checked = Boolean(article.is_series);
     field.status.value = article.status || "published";
     field.publishedAt.value = toLocalDateTimeInputValue(article.published_at);
     setSelectedTeams(parseTeamsInput(article.teams || []));
-    field.body.value = tickerData.bodyWithoutTicker;
-    field.bodyEditor.innerHTML = tickerData.bodyWithoutTicker;
+    field.body.value = normalizedBodyHtml;
+    field.bodyEditor.innerHTML = normalizedBodyHtml;
     normalizeEditorLinks(field.bodyEditor);
     normalizeEditorTables(field.bodyEditor);
     syncGenerateSlugButtonState();
     updateTableActionState();
+    setAdminView("article");
     setText(saveStatus, "Editing article", true);
     setText(saveError, "", false);
   };
@@ -1159,18 +1214,9 @@
     try {
       normalizeEditorLinks(field.bodyEditor);
       normalizeEditorTables(field.bodyEditor);
-      const bodyWithoutTicker = stripTickerParagraphFromBody(field.bodyEditor.innerHTML.trim());
-      const tickerText = String(field.ticker?.value || "").trim();
-
-      let composedBody = bodyWithoutTicker;
-      if (tickerText) {
-        const tickerParagraph = createTickerParagraphHtml(tickerText);
-        composedBody = bodyWithoutTicker
-          ? `${tickerParagraph}\n${bodyWithoutTicker}`
-          : tickerParagraph;
-      }
-
-      field.body.value = composedBody;
+      const cleanedBodyHtml = stripLegacyTickerParagraphFromBody(field.bodyEditor.innerHTML.trim());
+      field.bodyEditor.innerHTML = cleanedBodyHtml;
+      field.body.value = cleanedBodyHtml;
 
       const payload = {
         id: field.id.value || null,
@@ -1195,10 +1241,12 @@
       await refreshArticles();
       setText(saveStatus, "Article saved", true);
       setText(saveError, "", false);
+      flashSaveToast("Article saved");
       if (!field.id.value) {
         clearEditor();
+        setAdminView("article");
       } else {
-        field.body.value = bodyWithoutTicker;
+        field.body.value = cleanedBodyHtml;
       }
     } catch (error) {
       setText(saveError, error.message || "Unable to save article", true);
@@ -1206,7 +1254,48 @@
     }
   };
 
-  const handleDraftSaveShortcut = (event) => {
+  const handleHeadlineSave = async (event) => {
+    event.preventDefault();
+    if (!headlineTextInput) {
+      return;
+    }
+
+    setText(headlineStatus, "Saving headline...", true);
+    setText(headlineError, "", false);
+
+    try {
+      const result = await window.KBData.saveTickerHeadline(headlineTextInput.value);
+      const message = result?.scope === "remote"
+        ? "Headline saved"
+        : "Headline saved (local fallback)";
+      setText(headlineStatus, message, true);
+      setText(headlineError, "", false);
+    } catch (error) {
+      setText(headlineError, error.message || "Unable to save headline", true);
+      setText(headlineStatus, "", false);
+    }
+  };
+
+  const openHeadlineEditor = async () => {
+    if (!headlineTextInput) {
+      return;
+    }
+
+    setText(headlineStatus, "Loading headline...", true);
+    setText(headlineError, "", false);
+
+    try {
+      const headline = await window.KBData.fetchTickerHeadline();
+      headlineTextInput.value = headline || "";
+      setAdminView("headline");
+      setText(headlineStatus, "", false);
+    } catch (error) {
+      setText(headlineError, error.message || "Unable to load headline", true);
+      setText(headlineStatus, "", false);
+    }
+  };
+
+  const handleSaveShortcut = (event) => {
     const key = String(event.key || "").toLowerCase();
     const isSaveShortcut = (event.ctrlKey || event.metaKey) && key === "s";
     if (!isSaveShortcut) {
@@ -1217,11 +1306,14 @@
       return;
     }
 
+    if (articleEditorPanel && articleEditorPanel.hidden) {
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
 
-    field.status.value = "draft";
-    setText(saveStatus, "Saving draft...", true);
+    setText(saveStatus, "Saving article...", true);
     setText(saveError, "", false);
     articleForm.requestSubmit();
   };
@@ -1239,6 +1331,7 @@
 
     setVisibleState({ showWarning: false, showLogin: false, showEditor: true });
     await refreshArticles();
+    setAdminView("none");
   };
 
   const setup = async () => {
@@ -1248,12 +1341,51 @@
     updateTableActionState();
     setupTableBuilderDialog();
     setupDeleteArticleDialog();
+    setupActionConfirmDialog();
 
     loginForm.addEventListener("submit", handleLoginSubmit);
     articleForm.addEventListener("submit", handleArticleSave);
+    headlineForm?.addEventListener("submit", handleHeadlineSave);
 
-    newArticleButton.addEventListener("click", () => {
+    createArticleViewButton?.addEventListener("click", () => {
       clearEditor();
+      setAdminView("article");
+    });
+
+    updateHeadlineViewButton?.addEventListener("click", () => {
+      openHeadlineEditor();
+    });
+
+    closeHeadlineEditorButton?.addEventListener("click", () => {
+      setAdminView("none");
+      setText(headlineStatus, "", false);
+      setText(headlineError, "", false);
+    });
+
+    closeArticleEditorButton?.addEventListener("click", async () => {
+      const confirmed = await requestActionConfirm(
+        "Close the article editor and discard unsaved changes?",
+        "Close Editor"
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      clearEditor();
+      setAdminView("none");
+    });
+
+    newArticleButton.addEventListener("click", async () => {
+      const confirmed = await requestActionConfirm(
+        "Clear the form and remove unsaved edits?",
+        "Clear Form"
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      clearEditor();
+      setAdminView("article");
     });
 
     if (articleListSearch) {
@@ -1296,7 +1428,7 @@
       updateTableActionState();
     });
 
-    document.addEventListener("keydown", handleDraftSaveShortcut);
+    document.addEventListener("keydown", handleSaveShortcut);
 
     field.title.addEventListener("input", () => {
       syncGenerateSlugButtonState();
