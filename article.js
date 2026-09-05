@@ -11,6 +11,19 @@
 
 	const articleView = document.querySelector("#article-view");
 	const recentLinks = document.querySelector("#recent-article-links");
+	const sidebar = document.querySelector(".sidebar");
+
+	// Some browsers skip repainting the sidebar after async DOM updates until the
+	// next scroll; force a reflow so it always paints as soon as content is inserted.
+	const forceRepaint = (el) => {
+		if (!el) {
+			return;
+		}
+
+		el.style.display = "none";
+		void el.offsetHeight;
+		el.style.display = "";
+	};
 
 	const getSortableTimestamp = (article) => {
 		const timestamp = Date.parse(article.published_at || article.created_at || "");
@@ -237,16 +250,39 @@
 		recentLinks.innerHTML = "";
 
 		articles
-			.filter((article) => article.slug !== currentSlug)
 			.slice(0, SIDEBAR_LINK_LIMIT)
 			.forEach((article) => {
 				const item = document.createElement("li");
 				const link = document.createElement("a");
 				link.href = createArticleUrl(article);
 				link.textContent = article.title;
+				if (article.slug === currentSlug) {
+					link.setAttribute("aria-current", "page");
+				}
 				item.appendChild(link);
 				recentLinks.appendChild(item);
 			});
+
+		if (!recentLinks.children.length) {
+			const item = document.createElement("li");
+			item.textContent = "No related articles yet.";
+			recentLinks.appendChild(item);
+		}
+
+		forceRepaint(sidebar);
+	};
+
+	const showRecentLinksLoading = () => {
+		if (!recentLinks) {
+			return;
+		}
+
+		recentLinks.innerHTML = "";
+		const item = document.createElement("li");
+		item.textContent = "Loading related articles...";
+		recentLinks.appendChild(item);
+
+		forceRepaint(sidebar);
 	};
 
 	const normalizeArticleTables = (root = document) => {
@@ -530,20 +566,29 @@
 			return;
 		}
 
-		try {
-			const [article, publishedArticles] = await Promise.all([
-				window.KBData.fetchPublishedArticleBySlug(slug),
-				window.KBData.fetchPublishedArticles(),
-			]);
+		showRecentLinksLoading();
 
-			const sortedArticles = sortArticlesNewestFirst(publishedArticles || []);
-			renderRecentLinks(sortedArticles, slug);
+		try {
+			const publishedArticlesPromise = window.KBData
+				.fetchPublishedArticles()
+				.then((publishedArticles) => {
+					const sortedArticles = sortArticlesNewestFirst(publishedArticles || []);
+					renderRecentLinks(sortedArticles, slug);
+					return sortedArticles;
+				})
+				.catch(() => {
+					renderRecentLinks([], slug);
+					return [];
+				});
+
+			const article = await window.KBData.fetchPublishedArticleBySlug(slug);
 
 			if (!article) {
 				renderNotFound();
 				return;
 			}
 
+			const sortedArticles = await publishedArticlesPromise;
 			const nextArticle = getNextArticle(sortedArticles, slug);
 			renderArticle(article, nextArticle);
 		} catch (error) {
