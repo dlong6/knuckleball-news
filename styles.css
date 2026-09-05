@@ -104,7 +104,7 @@ a:hover {
 .headline-track {
   display: flex;
   width: max-content;
-  animation: headline-scroll 24s linear infinite;
+  animation: headline-scroll var(--headline-duration, 14s) linear infinite;
   will-change: transform;
 }
 
