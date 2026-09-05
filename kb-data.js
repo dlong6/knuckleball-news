@@ -248,6 +248,30 @@
     return error;
   };
 
+  const formatHeadlineWriteError = (error) => {
+    if (!error) {
+      return new Error("Unable to save headline.");
+    }
+
+    const message = String(error.message || "").toLowerCase();
+    if (
+      (message.includes("relation") && message.includes("headers") && message.includes("does not exist")) ||
+      error.code === "42P01"
+    ) {
+      return new Error(
+        'Supabase table public.headers is missing. Run the SQL in SUPABASE_SETUP.md under "Create the headers table".'
+      );
+    }
+
+    if (message.includes("row-level security") || error.code === "42501") {
+      return new Error(
+        'Headline save blocked by Supabase Row Level Security. Run the headers RLS policies from SUPABASE_SETUP.md.'
+      );
+    }
+
+    return error;
+  };
+
   const formatDate = (isoString) => {
     const date = new Date(isoString);
     if (Number.isNaN(date.getTime())) {
@@ -341,35 +365,35 @@
     return allArticles;
   };
 
-    const fetchTickerHeadline = async () => {
-      const localFallback = readLocalTickerHeadline();
-      if (!supabaseClient) {
+  const fetchTickerHeadline = async () => {
+    const localFallback = readLocalTickerHeadline();
+    if (!supabaseClient) {
+      return localFallback;
+    }
+
+    try {
+      const { data, error } = await supabaseClient
+        .from("headers")
+        .select("value")
+        .eq("key", "ticker_headline")
+        .maybeSingle();
+
+      if (error) {
         return localFallback;
       }
 
-      try {
-        const { data, error } = await supabaseClient
-          .from("site_settings")
-          .select("value")
-          .eq("key", "ticker_headline")
-          .maybeSingle();
-
-        if (error) {
-          return localFallback;
-        }
-
-        const remoteValue = String(data?.value || "").trim();
-        if (remoteValue) {
-          writeLocalTickerHeadline(remoteValue);
-        }
-
-        return remoteValue || localFallback;
-      } catch (_error) {
-        return localFallback;
+      const remoteValue = String(data?.value || "").trim();
+      if (remoteValue) {
+        writeLocalTickerHeadline(remoteValue);
       }
-    };
 
-    const saveTickerHeadline = async (headlineText) => {
+      return remoteValue || localFallback;
+    } catch (_error) {
+      return localFallback;
+    }
+  };
+
+  const saveTickerHeadline = async (headlineText) => {
       const normalized = String(headlineText || "").trim();
       writeLocalTickerHeadline(normalized);
 
@@ -390,16 +414,16 @@
 
       try {
         const { error } = await supabaseClient
-          .from("site_settings")
+          .from("headers")
           .upsert({ key: "ticker_headline", value: normalized }, { onConflict: "key" });
 
         if (error) {
-          return { headline: normalized, scope: "local" };
+          throw formatHeadlineWriteError(error);
         }
 
         return { headline: normalized, scope: "remote" };
-      } catch (_error) {
-        return { headline: normalized, scope: "local" };
+      } catch (error) {
+        throw formatHeadlineWriteError(error);
       }
     };
 

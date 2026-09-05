@@ -1,5 +1,6 @@
 (function () {
   const TICKER_CACHE_KEY = "knuckleball.latestTickerText.v1";
+  const LOCAL_TICKER_HEADLINE_KEY = "knuckleball.tickerHeadline.v1";
 
   const getHeadlineLinks = () => Array.from(document.querySelectorAll(".headline-track .headline-copy"));
 
@@ -27,8 +28,13 @@
     });
   };
 
-  const readCachedTickerText = () => {
+  const readStoredTickerText = () => {
     try {
+      const primary = String(window.localStorage.getItem(LOCAL_TICKER_HEADLINE_KEY) || "").trim();
+      if (primary) {
+        return primary;
+      }
+
       return String(window.localStorage.getItem(TICKER_CACHE_KEY) || "").trim();
     } catch (_error) {
       return "";
@@ -42,6 +48,7 @@
         return;
       }
 
+      window.localStorage.setItem(LOCAL_TICKER_HEADLINE_KEY, normalized);
       window.localStorage.setItem(TICKER_CACHE_KEY, normalized);
     } catch (_error) {
       // Ignore storage failures.
@@ -49,16 +56,16 @@
   };
 
   const setupTicker = async () => {
-    if (!window.KBData || typeof window.KBData.fetchTickerHeadline !== "function") {
-      return;
-    }
-
     if (!document.querySelector(".headline-track")) {
       return;
     }
 
-    // Render cached ticker immediately to avoid any static flash on refresh.
-    renderTickerText(readCachedTickerText());
+    // Render cached/local ticker immediately to avoid empty flashes on refresh.
+    renderTickerText(readStoredTickerText());
+
+    if (!window.KBData || typeof window.KBData.fetchTickerHeadline !== "function") {
+      return;
+    }
 
     try {
       const headlineText = await window.KBData.fetchTickerHeadline();
@@ -72,6 +79,14 @@
       // Keep cached ticker text if live fetch fails.
     }
   };
+
+  window.addEventListener("storage", (event) => {
+    if (event.key !== TICKER_CACHE_KEY && event.key !== LOCAL_TICKER_HEADLINE_KEY) {
+      return;
+    }
+
+    renderTickerText(readStoredTickerText());
+  });
 
   setupTicker();
 })();

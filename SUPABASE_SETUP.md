@@ -58,7 +58,29 @@ before update on public.articles
 for each row
 execute procedure public.set_updated_at();
 
-## 4) Turn on Row Level Security and policies
+## 4) Create the headers table
+
+In Supabase SQL Editor, run:
+
+```sql
+create table if not exists public.headers (
+  key text primary key,
+  value text not null default '',
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_headers_updated_at on public.headers;
+create trigger trg_headers_updated_at
+before update on public.headers
+for each row
+execute procedure public.set_updated_at();
+
+insert into public.headers (key, value)
+values ('ticker_headline', '')
+on conflict (key) do nothing;
+```
+
+## 5) Turn on Row Level Security and policies
 
 alter table public.articles enable row level security;
 
@@ -95,13 +117,35 @@ for delete
 to authenticated
 using (true);
 
-## 5) Create admin users
+alter table public.headers enable row level security;
+
+-- Public can read ticker headline
+create policy "Public can read headers"
+on public.headers
+for select
+using (true);
+
+-- Authenticated users can update headline values
+create policy "Authenticated users can insert headers"
+on public.headers
+for insert
+to authenticated
+with check (true);
+
+create policy "Authenticated users can update headers"
+on public.headers
+for update
+to authenticated
+using (true)
+with check (true);
+
+## 6) Create admin users
 
 In Supabase Auth -> Users:
 1. Add user manually (email + password).
 2. Share credentials only with verified publishers.
 
-## 6) Use the publishing interface
+## 7) Use the publishing interface
 
 1. Open admin.html.
 2. Sign in.
@@ -109,6 +153,7 @@ In Supabase Auth -> Users:
 4. Draft using the built-in toolbar (bold, italic, underline, strikethrough, links, photos, and Add Table).
 5. Published articles appear on index.html automatically.
 6. Each published story is reachable at article.html?slug=your-article-slug.
+7. Headline updates are saved to Supabase table public.headers and appear on all clients.
 
 ## Notes
 
@@ -169,4 +214,44 @@ If saving fails with a message that mentions is_series or "column does not exist
 ```sql
 alter table public.articles
 add column if not exists is_series boolean not null default false;
+```
+
+## Troubleshooting: headline still says local fallback
+
+If headline save fails with a missing table or RLS error, run:
+
+```sql
+create table if not exists public.headers (
+  key text primary key,
+  value text not null default '',
+  updated_at timestamptz not null default now()
+);
+
+alter table public.headers enable row level security;
+
+drop policy if exists "Public can read headers" on public.headers;
+drop policy if exists "Authenticated users can insert headers" on public.headers;
+drop policy if exists "Authenticated users can update headers" on public.headers;
+
+create policy "Public can read headers"
+on public.headers
+for select
+using (true);
+
+create policy "Authenticated users can insert headers"
+on public.headers
+for insert
+to authenticated
+with check (true);
+
+create policy "Authenticated users can update headers"
+on public.headers
+for update
+to authenticated
+using (true)
+with check (true);
+
+insert into public.headers (key, value)
+values ('ticker_headline', '')
+on conflict (key) do nothing;
 ```
