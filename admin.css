@@ -84,13 +84,19 @@
 
 .slug-inline-controls {
   display: block;
+  width: 100%;
 }
 
 .slug-label-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.45rem;
+}
+
+.slug-inline-controls input {
+  width: 100%;
+  min-height: 2.5rem;
 }
 
 .stack-form .slug-generate-button {

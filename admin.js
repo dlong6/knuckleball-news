@@ -42,6 +42,7 @@
   const actionConfirmSubmit = document.querySelector("#action-confirm-submit");
   const teamsSelector = document.querySelector("#article-teams-selector");
   const LEGACY_TICKER_ATTR = "data-wormburner-ticker";
+  const ARTICLE_DRAFT_STORAGE_KEY = "knuckleball.admin.articleDraft.v1";
   const TABLE_EDIT_ACTIONS = new Set([
     "table-row-add",
     "table-col-add",
@@ -72,6 +73,7 @@
   let actionConfirmResolver = null;
   let selectedTeams = new Set();
   let saveToastTimer = null;
+  let hasInitializedEditorView = false;
 
   const flashSaveToast = (message = "Article saved") => {
     if (!saveToast) {
@@ -129,7 +131,101 @@
     return new Date(value).toISOString();
   };
 
-  const clearEditor = () => {
+  const captureEditorState = () => ({
+    id: String(field.id.value || ""),
+    title: String(field.title.value || ""),
+    slug: String(field.slug.value || ""),
+    author: String(field.author.value || ""),
+    category: String(field.category.value || ""),
+    isSeries: Boolean(field.isSeries.checked),
+    status: String(field.status.value || "published"),
+    publishedAt: String(field.publishedAt.value || ""),
+    teams: Array.from(selectedTeams),
+    bodyHtml: String(field.bodyEditor.innerHTML || ""),
+  });
+
+  const hasMeaningfulEditorState = (state) => {
+    if (!state) {
+      return false;
+    }
+
+    const bodyText = String(state.bodyHtml || "").replace(/<[^>]*>/g, " ").trim();
+    return Boolean(
+      String(state.title || "").trim() ||
+      String(state.slug || "").trim() ||
+      String(state.author || "").trim() ||
+      String(state.category || "").trim() ||
+      String(state.id || "").trim() ||
+      bodyText ||
+      (Array.isArray(state.teams) && state.teams.length)
+    );
+  };
+
+  const writeDraftToStorage = () => {
+    try {
+      const state = captureEditorState();
+      if (!hasMeaningfulEditorState(state)) {
+        window.sessionStorage.removeItem(ARTICLE_DRAFT_STORAGE_KEY);
+        return;
+      }
+
+      window.sessionStorage.setItem(ARTICLE_DRAFT_STORAGE_KEY, JSON.stringify(state));
+    } catch (_error) {
+      // Ignore private-mode/session storage errors.
+    }
+  };
+
+  const clearDraftFromStorage = () => {
+    try {
+      window.sessionStorage.removeItem(ARTICLE_DRAFT_STORAGE_KEY);
+    } catch (_error) {
+      // Ignore storage errors.
+    }
+  };
+
+  const hydrateEditorFromState = (state) => {
+    field.id.value = String(state.id || "");
+    field.title.value = String(state.title || "");
+    field.slug.value = String(state.slug || "");
+    field.author.value = String(state.author || "");
+    field.category.value = String(state.category || "");
+    field.isSeries.checked = Boolean(state.isSeries);
+    field.status.value = String(state.status || "published");
+    field.publishedAt.value = String(state.publishedAt || toLocalDateTimeInputValue(new Date().toISOString()));
+    setSelectedTeams(parseTeamsInput(state.teams || []));
+
+    const normalizedBodyHtml = stripLegacyTickerParagraphFromBody(state.bodyHtml || "");
+    field.body.value = normalizedBodyHtml;
+    field.bodyEditor.innerHTML = normalizedBodyHtml;
+    normalizeEditorLinks(field.bodyEditor);
+    normalizeEditorTables(field.bodyEditor);
+    syncGenerateSlugButtonState();
+    updateTableActionState();
+  };
+
+  const restoreDraftFromStorage = () => {
+    try {
+      const raw = window.sessionStorage.getItem(ARTICLE_DRAFT_STORAGE_KEY);
+      if (!raw) {
+        return false;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!hasMeaningfulEditorState(parsed)) {
+        clearDraftFromStorage();
+        return false;
+      }
+
+      hydrateEditorFromState(parsed);
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  };
+
+  const clearEditor = (options = {}) => {
+    const { clearDraft = true } = options;
+
     field.id.value = "";
     field.title.value = "";
     field.slug.value = "";
@@ -147,6 +243,10 @@
     updateTableActionState();
     setText(saveStatus, "", false);
     setText(saveError, "", false);
+
+    if (clearDraft) {
+      clearDraftFromStorage();
+    }
   };
 
   const syncTeamsFieldValue = () => {
@@ -1076,6 +1176,7 @@
     setAdminView("article");
     setText(saveStatus, "Editing article", true);
     setText(saveError, "", false);
+    writeDraftToStorage();
   };
 
   const createActionButton = (text, className, onClick) => {
@@ -1247,6 +1348,7 @@
         setAdminView("article");
       } else {
         field.body.value = cleanedBodyHtml;
+        writeDraftToStorage();
       }
     } catch (error) {
       setText(saveError, error.message || "Unable to save article", true);
@@ -1326,12 +1428,18 @@
 
     if (!session) {
       setVisibleState({ showWarning: false, showLogin: true, showEditor: false });
+      hasInitializedEditorView = false;
       return;
     }
 
     setVisibleState({ showWarning: false, showLogin: false, showEditor: true });
     await refreshArticles();
-    setAdminView("none");
+
+    if (!hasInitializedEditorView) {
+      const restoredDraft = restoreDraftFromStorage();
+      setAdminView(restoredDraft ? "article" : "none");
+      hasInitializedEditorView = true;
+    }
   };
 
   const setup = async () => {
@@ -1348,7 +1456,7 @@
     headlineForm?.addEventListener("submit", handleHeadlineSave);
 
     createArticleViewButton?.addEventListener("click", () => {
-      clearEditor();
+      restoreDraftFromStorage();
       setAdminView("article");
     });
 
@@ -1408,16 +1516,35 @@
     }
 
     if (field.bodyEditor) {
+      field.bodyEditor.addEventListener("input", () => {
+        field.body.value = stripLegacyTickerParagraphFromBody(field.bodyEditor.innerHTML || "");
+        writeDraftToStorage();
+      });
       field.bodyEditor.addEventListener("mouseup", updateTableActionState);
       field.bodyEditor.addEventListener("keyup", updateTableActionState);
       field.bodyEditor.addEventListener("paste", () => {
         window.setTimeout(() => {
           normalizeEditorLinks(field.bodyEditor);
           normalizeEditorTables(field.bodyEditor);
+          field.body.value = stripLegacyTickerParagraphFromBody(field.bodyEditor.innerHTML || "");
+          writeDraftToStorage();
           updateTableActionState();
         }, 0);
       });
     }
+
+    [
+      field.title,
+      field.slug,
+      field.author,
+      field.category,
+      field.status,
+      field.publishedAt,
+      field.isSeries,
+    ].forEach((input) => {
+      input?.addEventListener("input", writeDraftToStorage);
+      input?.addEventListener("change", writeDraftToStorage);
+    });
 
     document.addEventListener("selectionchange", () => {
       const selection = window.getSelection();
@@ -1442,6 +1569,7 @@
         }
 
         field.slug.value = window.KBData.toSlug(title);
+        writeDraftToStorage();
       });
     }
 
