@@ -780,8 +780,64 @@
     });
   };
 
+  // Pasted content (Word, Google Docs, other sites) often arrives as one big
+  // wrapper <div> holding a nested <div> per paragraph, instead of a flat
+  // list of <p> tags. The div-to-<p> conversion below only looks at DIRECT
+  // children of .post-body, so if the whole article is buried one level
+  // deeper inside a single outer wrapper div, nothing inside it ever gets
+  // converted — it silently falls back to the page's base font and default
+  // sizing instead of the article's intended typography. This flattens any
+  // div that exists purely as a structural wrapper (no class of its own, no
+  // meaningful block content — just more div/p children) so real content
+  // rises up to become direct children of .post-body, where the existing
+  // conversion logic can actually reach it. Divs with a class (like
+  // stats-table-wrap) or with meaningful block content (images, tables,
+  // lists, headings) are left alone.
+  const unwrapStructuralDivWrappers = (root) => {
+    let changed = true;
+    let guard = 0;
+
+    while (changed && guard < 50) {
+      changed = false;
+      guard += 1;
+
+      Array.from(root.querySelectorAll("div")).forEach((div) => {
+        if (!root.contains(div) || div === root) {
+          return;
+        }
+
+        if (div.className) {
+          return;
+        }
+
+        const hasMeaningfulBlockContent = Boolean(
+          div.querySelector("img, picture, video, iframe, table, ul, ol, blockquote, h1, h2, h3, h4, h5, h6")
+        );
+        if (hasMeaningfulBlockContent) {
+          return;
+        }
+
+        const children = Array.from(div.children);
+        const isPureStructuralWrapper =
+          children.length > 0 && children.every((child) => child.tagName === "DIV" || child.tagName === "P");
+
+        if (!isPureStructuralWrapper) {
+          return;
+        }
+
+        while (div.firstChild) {
+          div.parentNode?.insertBefore(div.firstChild, div);
+        }
+        div.remove();
+        changed = true;
+      });
+    }
+  };
+
   const normalizePostBodyTypography = (root = document) => {
     Array.from(root.querySelectorAll(".post-body")).forEach((body) => {
+      unwrapStructuralDivWrappers(body);
+
       // Strip legacy presentational attributes that can override site typography.
       body.querySelectorAll("*").forEach((node) => {
         if (!(node instanceof HTMLElement)) {
@@ -823,7 +879,7 @@
         const cleaned = (node.innerHTML || "")
           .replace(/<br\s*\/?>/gi, "")
           .replace(/&nbsp;/gi, "")
-          .replace(/[\s\u200b\u200c\u200d\ufeff]/g, "");
+          .replace(/[\s​‌‍﻿]/g, "");
 
         return cleaned.length === 0;
       };
