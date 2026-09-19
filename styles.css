@@ -864,8 +864,10 @@ a.tag-chip:hover {
   font-style: italic;
 }
 
-/* Under-table note text should stay small, even when rich text contains inline styles. */
-.post-body .stats-table-wrap + p,
+/* Under-table note text should stay small, even when rich text contains inline styles.
+   Only elements explicitly marked as a caption (class="table-caption") get this treatment -
+   we don't style by position anymore, since that caught real body paragraphs that just
+   happened to come right after a table. */
 .post-body .stats-table-wrap + .table-caption,
 .post-body p.table-caption,
 .post-body .table-caption {
