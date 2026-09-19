@@ -585,10 +585,10 @@ a.tag-chip:hover {
   font-style: italic;
 }
 
-.post-body p {
-  margin: 0 0 0.95rem;
-}
-
+/* Article body typography — consolidated into one block per concern so
+   there's a single place to look, instead of the same selector (.post-body,
+   .post-body p, .post-body headings) being declared in two places with two
+   different values, which is how this drifted out of sync before. */
 .post-body {
   color: #3b5066;
   font-weight: 400;
@@ -600,10 +600,6 @@ a.tag-chip:hover {
 
 .post-body a:hover {
   text-decoration: underline;
-}
-
-.post-body :is(h1, h2, h3, h4, h5, h6) {
-  font-weight: 500;
 }
 
 .post-body :is(strong, b) {

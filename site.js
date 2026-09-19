@@ -707,246 +707,332 @@
     });
   };
 
-  const normalizeArticleTables = (root = document) => {
-    Array.from(root.querySelectorAll(".post-body table")).forEach((table) => {
-      let parent = table.parentElement;
-      while (parent && parent !== root && !parent.classList.contains("stats-table-wrap")) {
-        const tag = parent.tagName.toLowerCase();
-        const canUnwrap = ["div", "figure", "section", "article", "span"].includes(tag);
-        const hasOnlyTableChild = parent.children.length === 1 && parent.firstElementChild === table;
-        if (!canUnwrap || !hasOnlyTableChild) {
-          break;
-        }
+  // ---------------------------------------------------------------------
+  // Post-body sanitizer.
+  //
+  // Earlier versions of this file tried to detect and fix up specific
+  // shapes of messy pasted content (deeply-nested wrapper divs, stray
+  // presentational attributes, "junk" empty wrappers at the start/end of an
+  // article). That reactive, pattern-matching approach kept finding new
+  // gaps — most seriously, the div-unwrapping pass could silently drop an
+  // entire paragraph if its wrapper didn't exactly match the expected
+  // shape, which is exactly what happened to a paragraph in one article.
+  //
+  // This sanitizer instead REBUILDS each article body from scratch using
+  // only a small, fixed set of allowed elements (paragraphs, bold/italic/
+  // underline/strike, links, images, lists, tables, headings, and the
+  // explicit "table-caption" class). Every node in the source is visited
+  // exactly once and is either emitted as one of those allowed elements,
+  // folded into the current paragraph as plain text/inline formatting, or
+  // (for an unrecognized wrapper) unwrapped so its CONTENTS still get
+  // processed. Nothing is ever skipped wholesale, so content can't
+  // silently disappear. This is the same approach used in the admin
+  // editor when an article is saved, so articles saved going forward
+  // arrive here already in this shape — this pass is mainly a safety net
+  // for older articles saved before that existed.
+  const SANITIZE_INLINE_MARKS = { strong: "strong", b: "strong", em: "em", i: "em", u: "u", s: "s", strike: "s", del: "s" };
+  const SANITIZE_BLOCK_BOUNDARY_TAGS = new Set(["p", "div", "section", "article", "blockquote", "header", "footer", "figure"]);
+  const LEGACY_TICKER_ATTR = "data-wormburner-ticker";
 
-        const grandParent = parent.parentNode;
-        if (!grandParent) {
-          break;
+  const sanitizeWalkInlineChildrenInto = (node, container) => {
+    Array.from(node.childNodes).forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        if (child.textContent) {
+          container.appendChild(document.createTextNode(child.textContent));
         }
-
-        grandParent.insertBefore(table, parent);
-        parent.remove();
-        parent = table.parentElement;
+        return;
       }
 
-      const formattingNodes = [
-        table,
-        ...table.querySelectorAll("thead, tbody, tfoot, tr, th, td, colgroup, col, caption, p, div, span, font, strong, em, b, i, u"),
-      ];
-
-      formattingNodes.forEach((node) => {
-        node.removeAttribute("style");
-        node.removeAttribute("class");
-        node.removeAttribute("width");
-        node.removeAttribute("height");
-        node.removeAttribute("align");
-        node.removeAttribute("valign");
-        node.removeAttribute("bgcolor");
-        node.removeAttribute("border");
-        node.removeAttribute("cellpadding");
-        node.removeAttribute("cellspacing");
-      });
-
-      table.querySelectorAll("colgroup, col, caption").forEach((node) => node.remove());
-      table.querySelectorAll("th, td").forEach((cell) => {
-        let text = (cell.textContent || "").replace(/\s+/g, " ").trim();
-        if (cell.tagName === "TH") {
-          text = text.replace(/\s*click to sort (ascending|descending)\s*/gi, " ").replace(/\s+/g, " ").trim();
-          text = text.replace(/\s*\([^)]*\)\s*$/g, "").trim();
-        }
-        cell.innerHTML = text;
-      });
-
-      table.className = "stats-table";
-      const columnCount = Array.from(table.querySelectorAll("tr")).reduce((maxCount, row) => {
-        const cells = row.querySelectorAll("th, td").length;
-        return Math.max(maxCount, cells);
-      }, 0);
-      table.classList.toggle("stats-table-wide", columnCount >= 6);
-
-      if (!table.closest(".stats-table-wrap")) {
-        const wrap = document.createElement("div");
-        wrap.className = "stats-table-wrap";
-        wrap.setAttribute("aria-label", "Article data table");
-        table.parentNode?.insertBefore(wrap, table);
-        wrap.appendChild(table);
+      if (child.nodeType !== Node.ELEMENT_NODE) {
+        return;
       }
+
+      const tag = child.tagName.toLowerCase();
+
+      if (tag === "br") {
+        container.appendChild(document.createElement("br"));
+        return;
+      }
+
+      if (SANITIZE_INLINE_MARKS[tag]) {
+        const clean = document.createElement(SANITIZE_INLINE_MARKS[tag]);
+        container.appendChild(clean);
+        sanitizeWalkInlineChildrenInto(child, clean);
+        return;
+      }
+
+      if (tag === "a") {
+        const href = child.getAttribute("href") || "";
+        if (href) {
+          const clean = document.createElement("a");
+          clean.setAttribute("href", href);
+          clean.setAttribute("target", "_blank");
+          clean.setAttribute("rel", "noopener noreferrer");
+          container.appendChild(clean);
+          sanitizeWalkInlineChildrenInto(child, clean);
+        } else {
+          sanitizeWalkInlineChildrenInto(child, container);
+        }
+        return;
+      }
+
+      if (tag === "img") {
+        const src = child.getAttribute("src") || "";
+        if (src) {
+          const clean = document.createElement("img");
+          clean.setAttribute("src", src);
+          clean.setAttribute("alt", child.getAttribute("alt") || "");
+          clean.className = "editor-image";
+          container.appendChild(clean);
+        }
+        return;
+      }
+
+      sanitizeWalkInlineChildrenInto(child, container);
     });
   };
 
-  const normalizePostBodyLinks = (root = document) => {
-    Array.from(root.querySelectorAll(".post-body a[href]")).forEach((link) => {
-      link.setAttribute("target", "_blank");
-      link.setAttribute("rel", "noopener noreferrer");
-    });
-  };
+  const sanitizeBuildCleanTable = (table) => {
+    const buildSection = (sourceSection, tagName) => {
+      const rows = sourceSection ? Array.from(sourceSection.children).filter((c) => c.tagName === "TR") : [];
+      if (!rows.length) {
+        return null;
+      }
 
-  // Pasted content (Word, Google Docs, other sites) often arrives as one big
-  // wrapper <div> holding a nested <div> per paragraph, instead of a flat
-  // list of <p> tags. The div-to-<p> conversion below only looks at DIRECT
-  // children of .post-body, so if the whole article is buried one level
-  // deeper inside a single outer wrapper div, nothing inside it ever gets
-  // converted — it silently falls back to the page's base font and default
-  // sizing instead of the article's intended typography. This flattens any
-  // div that exists purely as a structural wrapper (no class of its own, and
-  // every DIRECT child is itself just another div or paragraph) so real
-  // content rises up to become direct children of .post-body, where the
-  // existing conversion logic can actually reach it. A div whose direct
-  // children include a table, image, list, or heading is left alone even if
-  // one of those things also happens to live further down inside one of its
-  // *nested* divs — those nested divs still get their own turn to unwrap
-  // (or correctly stay put) on the next pass. Checking only direct children,
-  // rather than searching the whole subtree, is what makes that possible:
-  // a wrapper around "a bunch of paragraphs plus a table, all as siblings"
-  // still needs to be unwrapped so the paragraphs can become real <p> tags,
-  // even though a table exists somewhere underneath it.
-  const unwrapStructuralDivWrappers = (root) => {
-    let changed = true;
-    let guard = 0;
-
-    while (changed && guard < 50) {
-      changed = false;
-      guard += 1;
-
-      Array.from(root.querySelectorAll("div")).forEach((div) => {
-        if (!root.contains(div) || div === root) {
-          return;
+      const section = document.createElement(tagName);
+      rows.forEach((row) => {
+        const cleanRow = document.createElement("tr");
+        Array.from(row.children)
+          .filter((c) => c.tagName === "TD" || c.tagName === "TH")
+          .forEach((cell) => {
+            const cleanCell = document.createElement(cell.tagName.toLowerCase());
+            let text = (cell.textContent || "").replace(/\s+/g, " ").trim();
+            if (cell.tagName === "TH") {
+              text = text.replace(/\s*click to sort (ascending|descending)\s*/gi, " ").replace(/\s+/g, " ").trim();
+              text = text.replace(/\s*\([^)]*\)\s*$/g, "").trim();
+              cleanCell.setAttribute("scope", "col");
+            }
+            cleanCell.textContent = text;
+            cleanRow.appendChild(cleanCell);
+          });
+        if (cleanRow.children.length) {
+          section.appendChild(cleanRow);
         }
-
-        if (div.className) {
-          return;
-        }
-
-        const children = Array.from(div.children);
-        const isPureStructuralWrapper =
-          children.length > 0 && children.every((child) => ["DIV", "P", "BR"].includes(child.tagName));
-
-        if (!isPureStructuralWrapper) {
-          return;
-        }
-
-        while (div.firstChild) {
-          div.parentNode?.insertBefore(div.firstChild, div);
-        }
-        div.remove();
-        changed = true;
       });
+      return section.children.length ? section : null;
+    };
+
+    const cleanTable = document.createElement("table");
+    cleanTable.className = "stats-table";
+
+    const theadSource = table.querySelector("thead");
+    const tbodySource = table.querySelector("tbody") || table;
+    const cleanThead = buildSection(theadSource, "thead");
+    const cleanTbody = buildSection(tbodySource, "tbody");
+
+    if (!cleanThead && cleanTbody && cleanTbody.firstElementChild) {
+      const firstRow = cleanTbody.firstElementChild;
+      const allHeaderCells = Array.from(firstRow.children).every((c) => c.tagName === "TH");
+      if (allHeaderCells) {
+        const promotedThead = document.createElement("thead");
+        promotedThead.appendChild(firstRow);
+        cleanTable.appendChild(promotedThead);
+      }
+    } else if (cleanThead) {
+      cleanTable.appendChild(cleanThead);
     }
+
+    if (cleanTbody && cleanTbody.children.length) {
+      cleanTable.appendChild(cleanTbody);
+    }
+
+    if (!cleanTable.querySelector("tr")) {
+      return null;
+    }
+
+    const columnCount = Array.from(cleanTable.querySelectorAll("tr")).reduce(
+      (maxCount, row) => Math.max(maxCount, row.children.length),
+      0
+    );
+    cleanTable.classList.toggle("stats-table-wide", columnCount >= 6);
+
+    const wrap = document.createElement("div");
+    wrap.className = "stats-table-wrap";
+    wrap.setAttribute("aria-label", "Article data table");
+    wrap.appendChild(cleanTable);
+    return wrap;
+  };
+
+  const sanitizeBuildCleanList = (listNode, tagName) => {
+    const clean = document.createElement(tagName);
+    Array.from(listNode.children)
+      .filter((c) => c.tagName === "LI")
+      .forEach((li) => {
+        const cleanLi = document.createElement("li");
+        sanitizeWalkInlineChildrenInto(li, cleanLi);
+        if (cleanLi.textContent.trim()) {
+          clean.appendChild(cleanLi);
+        }
+      });
+    return clean.children.length ? clean : null;
+  };
+
+  const sanitizeCreateParagraphState = (output) => {
+    let currentParagraph = null;
+    return {
+      getParagraph() {
+        if (!currentParagraph) {
+          currentParagraph = document.createElement("p");
+        }
+        return currentParagraph;
+      },
+      flush() {
+        if (currentParagraph && currentParagraph.textContent.replace(/ /g, " ").trim() !== "") {
+          output.appendChild(currentParagraph);
+        }
+        currentParagraph = null;
+      },
+    };
+  };
+
+  const sanitizeAppendInline = (node, state) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (node.textContent) {
+        state.getParagraph().appendChild(document.createTextNode(node.textContent));
+      }
+      return;
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return;
+    }
+
+    const tag = node.tagName.toLowerCase();
+
+    if (tag === "br") {
+      state.getParagraph().appendChild(document.createElement("br"));
+      return;
+    }
+
+    if (SANITIZE_INLINE_MARKS[tag]) {
+      const clean = document.createElement(SANITIZE_INLINE_MARKS[tag]);
+      state.getParagraph().appendChild(clean);
+      sanitizeWalkInlineChildrenInto(node, clean);
+      return;
+    }
+
+    if (tag === "a") {
+      const href = node.getAttribute("href") || "";
+      if (href) {
+        const clean = document.createElement("a");
+        clean.setAttribute("href", href);
+        clean.setAttribute("target", "_blank");
+        clean.setAttribute("rel", "noopener noreferrer");
+        state.getParagraph().appendChild(clean);
+        sanitizeWalkInlineChildrenInto(node, clean);
+      } else {
+        Array.from(node.childNodes).forEach((child) => sanitizeAppendInline(child, state));
+      }
+      return;
+    }
+
+    if (tag === "img") {
+      const src = node.getAttribute("src") || "";
+      if (src) {
+        const clean = document.createElement("img");
+        clean.setAttribute("src", src);
+        clean.setAttribute("alt", node.getAttribute("alt") || "");
+        clean.className = "editor-image";
+        state.getParagraph().appendChild(clean);
+      }
+      return;
+    }
+
+    Array.from(node.childNodes).forEach((child) => sanitizeAppendInline(child, state));
+  };
+
+  const sanitizeProcessChildren = (sourceNode, output, state) => {
+    Array.from(sourceNode.childNodes).forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        sanitizeAppendInline(child, state);
+        return;
+      }
+
+      if (child.nodeType !== Node.ELEMENT_NODE) {
+        return;
+      }
+
+      const tag = child.tagName.toLowerCase();
+
+      if (tag === "table") {
+        state.flush();
+        const clean = sanitizeBuildCleanTable(child);
+        if (clean) {
+          output.appendChild(clean);
+        }
+        return;
+      }
+
+      if (tag === "ul" || tag === "ol") {
+        state.flush();
+        const clean = sanitizeBuildCleanList(child, tag);
+        if (clean) {
+          output.appendChild(clean);
+        }
+        return;
+      }
+
+      if (/^h[1-6]$/.test(tag)) {
+        state.flush();
+        const heading = document.createElement(tag);
+        sanitizeWalkInlineChildrenInto(child, heading);
+        if (heading.textContent.trim()) {
+          output.appendChild(heading);
+        }
+        return;
+      }
+
+      if (tag === "p" && child.classList.contains("table-caption")) {
+        state.flush();
+        const caption = document.createElement("p");
+        caption.className = "table-caption";
+        sanitizeWalkInlineChildrenInto(child, caption);
+        if (caption.textContent.trim()) {
+          output.appendChild(caption);
+        }
+        return;
+      }
+
+      if (SANITIZE_BLOCK_BOUNDARY_TAGS.has(tag)) {
+        state.flush();
+        sanitizeProcessChildren(child, output, state);
+        state.flush();
+        return;
+      }
+
+      sanitizeAppendInline(child, state);
+    });
+  };
+
+  const sanitizePostBodyHtml = (html) => {
+    const source = document.createElement("div");
+    source.innerHTML = String(html || "");
+    const output = document.createElement("div");
+    const state = sanitizeCreateParagraphState(output);
+    sanitizeProcessChildren(source, output, state);
+    state.flush();
+    return output.innerHTML.trim();
   };
 
   const normalizePostBodyTypography = (root = document) => {
     Array.from(root.querySelectorAll(".post-body")).forEach((body) => {
-      unwrapStructuralDivWrappers(body);
-
-      // Strip legacy presentational attributes that can override site typography.
-      body.querySelectorAll("*").forEach((node) => {
-        if (!(node instanceof HTMLElement)) {
-          return;
-        }
-
-        node.removeAttribute("style");
-        node.removeAttribute("align");
-        node.removeAttribute("face");
-        node.removeAttribute("size");
-        node.removeAttribute("color");
-      });
-
-      // Unwrap purely presentational inline wrappers.
-      body.querySelectorAll("font, span").forEach((node) => {
-        if (!(node instanceof HTMLElement)) {
-          return;
-        }
-
-        while (node.firstChild) {
-          node.parentNode?.insertBefore(node.firstChild, node);
-        }
-        node.remove();
-      });
-
-      const isJunkWrapper = (node) => {
-        if (!(node instanceof HTMLElement)) {
-          return false;
-        }
-
-        if (!node.matches("div, p, span")) {
-          return false;
-        }
-
-        if (node.querySelector("img, picture, video, iframe, table, ul, ol, blockquote, h1, h2, h3, h4, h5, h6")) {
-          return false;
-        }
-
-        const cleaned = (node.innerHTML || "")
-          .replace(/<br\s*\/?>/gi, "")
-          .replace(/&nbsp;/gi, "")
-          .replace(/[\s​‌‍﻿]/g, "");
-
-        return cleaned.length === 0;
-      };
-
-      while (body.firstChild && (body.firstChild.nodeType === Node.TEXT_NODE && !(body.firstChild.textContent || "").trim())) {
-        body.firstChild.remove();
-      }
-
-      while (body.lastChild && (body.lastChild.nodeType === Node.TEXT_NODE && !(body.lastChild.textContent || "").trim())) {
-        body.lastChild.remove();
-      }
-
-      while (isJunkWrapper(body.firstElementChild)) {
-        body.firstElementChild.remove();
-      }
-
-      while (isJunkWrapper(body.lastElementChild)) {
-        body.lastElementChild.remove();
-      }
-
-      Array.from(body.querySelectorAll(":scope > div")).forEach((node) => {
-        if (isJunkWrapper(node)) {
-          node.remove();
-          return;
-        }
-
-        const hasBlockChildren = Boolean(
-          node.querySelector("p, div, ul, ol, table, blockquote, h1, h2, h3, h4, h5, h6")
-        );
-        if (!hasBlockChildren) {
-          const paragraph = document.createElement("p");
-          paragraph.innerHTML = node.innerHTML;
-          node.replaceWith(paragraph);
-        }
-      });
-
-      Array.from(body.querySelectorAll(":scope > br")).forEach((node) => {
-        node.remove();
-      });
-
-      const firstNode = body.firstChild;
-      if (firstNode && firstNode.nodeType === Node.TEXT_NODE) {
-        const text = (firstNode.textContent || "").trim();
-        if (text) {
-          const paragraph = document.createElement("p");
-          paragraph.textContent = text;
-          firstNode.replaceWith(paragraph);
-        }
-      }
-
-      while (body.firstElementChild && body.firstElementChild.tagName === "BR") {
-        body.firstElementChild.remove();
-      }
-
-      while (body.lastElementChild && body.lastElementChild.tagName === "BR") {
-        body.lastElementChild.remove();
-      }
-
-      body.querySelectorAll("[data-wormburner-ticker='true']").forEach((node) => {
-        node.remove();
-      });
+      body.querySelectorAll(`[${LEGACY_TICKER_ATTR}="true"]`).forEach((node) => node.remove());
+      body.innerHTML = sanitizePostBodyHtml(body.innerHTML);
     });
   };
 
   const enableAllTableTools = (root = document) => {
     normalizePostBodyTypography(root);
-    normalizeArticleTables(root);
-    normalizePostBodyLinks(root);
     Array.from(root.querySelectorAll(".stats-table")).forEach((table) => {
       enableTableSorting(table);
     });

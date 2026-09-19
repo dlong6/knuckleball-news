@@ -197,9 +197,7 @@
     const normalizedBodyHtml = stripLegacyTickerParagraphFromBody(state.bodyHtml || "");
     field.body.value = normalizedBodyHtml;
     field.bodyEditor.innerHTML = normalizedBodyHtml;
-    normalizeEditorLinks(field.bodyEditor);
-    normalizeEditorTables(field.bodyEditor);
-    stripPresentationalFormatting(field.bodyEditor);
+    sanitizeEditorContent(field.bodyEditor);
     syncGenerateSlugButtonState();
     updateTableActionState();
   };
@@ -491,108 +489,370 @@
     });
   };
 
-  const normalizeEditorTables = (root = field.bodyEditor) => {
-    if (!root) {
-      return;
-    }
+  // ---------------------------------------------------------------------
+  // Editor content sanitizer.
+  //
+  // Earlier versions of this file tried to detect and strip specific known
+  // problems in pasted content (inline style attributes, <font> tags, extra
+  // table wrappers, deeply-nested <div> wrappers from Word/Google Docs).
+  // That reactive, pattern-matching approach kept finding new gaps — most
+  // seriously, a div-unwrapping pass could silently drop an entire
+  // paragraph if its wrapper didn't exactly match the expected shape.
+  //
+  // This sanitizer takes the opposite approach: instead of trying to detect
+  // and remove everything bad, it REBUILDS the content from scratch using
+  // only a small, fixed set of allowed elements (paragraphs, bold/italic/
+  // underline/strike, links, images, lists, tables, headings). Every node
+  // in the source is visited exactly once and is either emitted as one of
+  // those allowed elements, folded into the current paragraph as plain
+  // text/inline formatting, or (for an unrecognized wrapper like a stray
+  // <span> or <font> or a deeply nested <div>) unwrapped so its CONTENTS
+  // still get processed. Nothing is ever skipped wholesale, so content
+  // can't silently disappear the way it could with the old approach.
+  const SANITIZE_INLINE_MARKS = { strong: "strong", b: "strong", em: "em", i: "em", u: "u", s: "s", strike: "s", del: "s" };
+  const SANITIZE_BLOCK_BOUNDARY_TAGS = new Set(["p", "div", "section", "article", "blockquote", "header", "footer", "figure"]);
 
-    Array.from(root.querySelectorAll("table")).forEach((table) => {
-      // Unwrap common pasted containers so only the canonical wrapper remains.
-      let parent = table.parentElement;
-      while (parent && parent !== root && !parent.classList.contains("stats-table-wrap")) {
-        const tag = parent.tagName.toLowerCase();
-        const canUnwrap = ["div", "figure", "section", "article", "span"].includes(tag);
-        const hasOnlyTableChild = parent.children.length === 1 && parent.firstElementChild === table;
-        if (!canUnwrap || !hasOnlyTableChild) {
-          break;
+  // Fills `container` with a clean copy of `node`'s children, allowing only
+  // text, line breaks, the inline marks above, links, and images. Used both
+  // for building nested inline content (e.g. <strong> inside a paragraph)
+  // and for list items and headings, which only ever contain inline content.
+  const sanitizeWalkInlineChildrenInto = (node, container) => {
+    Array.from(node.childNodes).forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        if (child.textContent) {
+          container.appendChild(document.createTextNode(child.textContent));
         }
-
-        const grandParent = parent.parentNode;
-        if (!grandParent) {
-          break;
-        }
-
-        grandParent.insertBefore(table, parent);
-        parent.remove();
-        parent = table.parentElement;
-      }
-
-      const formattingNodes = [
-        table,
-        ...table.querySelectorAll("thead, tbody, tfoot, tr, th, td, colgroup, col, caption, p, div, span, font, strong, em, b, i, u"),
-      ];
-
-      formattingNodes.forEach((node) => {
-        node.removeAttribute("style");
-        node.removeAttribute("class");
-        node.removeAttribute("width");
-        node.removeAttribute("height");
-        node.removeAttribute("align");
-        node.removeAttribute("valign");
-        node.removeAttribute("bgcolor");
-        node.removeAttribute("border");
-        node.removeAttribute("cellpadding");
-        node.removeAttribute("cellspacing");
-      });
-
-      // Remove pasted column sizing so CSS controls widths consistently.
-      table.querySelectorAll("colgroup, col").forEach((node) => node.remove());
-      table.querySelectorAll("caption").forEach((node) => node.remove());
-
-      // Flatten rich pasted formatting to plain text so all cells match site styling.
-      table.querySelectorAll("th, td").forEach((cell) => {
-        let text = (cell.textContent || "").replace(/\s+/g, " ").trim();
-        if (cell.tagName === "TH") {
-          text = text.replace(/\s*click to sort (ascending|descending)\s*/gi, " ").replace(/\s+/g, " ").trim();
-          text = text.replace(/\s*\([^)]*\)\s*$/g, "").trim();
-        }
-        cell.innerHTML = text;
-      });
-
-      table.className = "stats-table";
-
-      if (!table.closest(".stats-table-wrap")) {
-        const wrap = document.createElement("div");
-        wrap.className = "stats-table-wrap";
-        wrap.setAttribute("aria-label", "Article data table");
-        table.parentNode?.insertBefore(wrap, table);
-        wrap.appendChild(table);
-      }
-    });
-  };
-
-  // Attributes that let pasted content (from Word, Google Docs, or another
-  // webpage) carry its own font/color/size along with the text, overriding
-  // this site's CSS. normalizeEditorTables already strips these from
-  // anything inside a <table> — this does the same for the rest of the
-  // article body, which previously had no sanitization at all. That gap is
-  // why a pasted paragraph could render in a different font than text typed
-  // directly into the editor, even within the same article.
-  const PRESENTATIONAL_ATTRIBUTES = ["style", "face", "color", "size", "bgcolor"];
-
-  const stripPresentationalFormatting = (root = field.bodyEditor) => {
-    if (!root) {
-      return;
-    }
-
-    const nodes = [root, ...root.querySelectorAll("*")];
-    nodes.forEach((node) => {
-      PRESENTATIONAL_ATTRIBUTES.forEach((attr) => node.removeAttribute(attr));
-    });
-
-    // A <font> tag with no attributes left has no visual effect, but unwrap
-    // it anyway so empty legacy tags don't linger in the saved markup.
-    root.querySelectorAll("font").forEach((fontNode) => {
-      const parent = fontNode.parentNode;
-      if (!parent) {
         return;
       }
 
-      while (fontNode.firstChild) {
-        parent.insertBefore(fontNode.firstChild, fontNode);
+      if (child.nodeType !== Node.ELEMENT_NODE) {
+        return;
       }
-      parent.removeChild(fontNode);
+
+      const tag = child.tagName.toLowerCase();
+
+      if (tag === "br") {
+        container.appendChild(document.createElement("br"));
+        return;
+      }
+
+      if (SANITIZE_INLINE_MARKS[tag]) {
+        const clean = document.createElement(SANITIZE_INLINE_MARKS[tag]);
+        container.appendChild(clean);
+        sanitizeWalkInlineChildrenInto(child, clean);
+        return;
+      }
+
+      if (tag === "a") {
+        const href = child.getAttribute("href") || "";
+        if (href) {
+          const clean = document.createElement("a");
+          clean.setAttribute("href", href);
+          clean.setAttribute("target", "_blank");
+          clean.setAttribute("rel", "noopener noreferrer");
+          container.appendChild(clean);
+          sanitizeWalkInlineChildrenInto(child, clean);
+        } else {
+          sanitizeWalkInlineChildrenInto(child, container);
+        }
+        return;
+      }
+
+      if (tag === "img") {
+        const src = child.getAttribute("src") || "";
+        if (src) {
+          const clean = document.createElement("img");
+          clean.setAttribute("src", src);
+          clean.setAttribute("alt", child.getAttribute("alt") || "");
+          clean.className = "editor-image";
+          container.appendChild(clean);
+        }
+        return;
+      }
+
+      // Unrecognized inline-ish wrapper (span, font, sup, sub, pasted-site
+      // markup, etc.) — unwrap it: keep its content, drop the wrapper and
+      // whatever attributes it carried.
+      sanitizeWalkInlineChildrenInto(child, container);
     });
+  };
+
+  // Rebuilds a pasted/stored <table> into the site's canonical structure:
+  // a <table class="stats-table"> with plain-text cells, wrapped in
+  // <div class="stats-table-wrap">. Handles tables that already have a
+  // proper <thead>, and tables where the first row uses <th> cells but
+  // never got wrapped in an explicit <thead>.
+  const sanitizeBuildCleanTable = (table) => {
+    const buildSection = (sourceSection, tagName) => {
+      const rows = sourceSection ? Array.from(sourceSection.children).filter((c) => c.tagName === "TR") : [];
+      if (!rows.length) {
+        return null;
+      }
+
+      const section = document.createElement(tagName);
+      rows.forEach((row) => {
+        const cleanRow = document.createElement("tr");
+        Array.from(row.children)
+          .filter((c) => c.tagName === "TD" || c.tagName === "TH")
+          .forEach((cell) => {
+            const cleanCell = document.createElement(cell.tagName.toLowerCase());
+            let text = (cell.textContent || "").replace(/\s+/g, " ").trim();
+            if (cell.tagName === "TH") {
+              text = text.replace(/\s*click to sort (ascending|descending)\s*/gi, " ").replace(/\s+/g, " ").trim();
+              text = text.replace(/\s*\([^)]*\)\s*$/g, "").trim();
+              cleanCell.setAttribute("scope", "col");
+            }
+            cleanCell.textContent = text;
+            cleanRow.appendChild(cleanCell);
+          });
+        if (cleanRow.children.length) {
+          section.appendChild(cleanRow);
+        }
+      });
+      return section.children.length ? section : null;
+    };
+
+    const cleanTable = document.createElement("table");
+    cleanTable.className = "stats-table";
+
+    const theadSource = table.querySelector("thead");
+    const tbodySource = table.querySelector("tbody") || table;
+    const cleanThead = buildSection(theadSource, "thead");
+    const cleanTbody = buildSection(tbodySource, "tbody");
+
+    if (!cleanThead && cleanTbody && cleanTbody.firstElementChild) {
+      const firstRow = cleanTbody.firstElementChild;
+      const allHeaderCells = Array.from(firstRow.children).every((c) => c.tagName === "TH");
+      if (allHeaderCells) {
+        const promotedThead = document.createElement("thead");
+        promotedThead.appendChild(firstRow);
+        cleanTable.appendChild(promotedThead);
+      }
+    } else if (cleanThead) {
+      cleanTable.appendChild(cleanThead);
+    }
+
+    if (cleanTbody && cleanTbody.children.length) {
+      cleanTable.appendChild(cleanTbody);
+    }
+
+    if (!cleanTable.querySelector("tr")) {
+      return null;
+    }
+
+    const wrap = document.createElement("div");
+    wrap.className = "stats-table-wrap";
+    wrap.setAttribute("aria-label", "Article data table");
+    wrap.appendChild(cleanTable);
+    return wrap;
+  };
+
+  const sanitizeBuildCleanList = (listNode, tagName) => {
+    const clean = document.createElement(tagName);
+    Array.from(listNode.children)
+      .filter((c) => c.tagName === "LI")
+      .forEach((li) => {
+        const cleanLi = document.createElement("li");
+        sanitizeWalkInlineChildrenInto(li, cleanLi);
+        if (cleanLi.textContent.trim()) {
+          clean.appendChild(cleanLi);
+        }
+      });
+    return clean.children.length ? clean : null;
+  };
+
+  // Tracks the paragraph currently being built as top-level content is
+  // walked, so that a run of text/inline elements across several source
+  // nodes (or several nested wrapper divs) collapses into a single <p>.
+  const sanitizeCreateParagraphState = (output) => {
+    let currentParagraph = null;
+    return {
+      getParagraph() {
+        if (!currentParagraph) {
+          currentParagraph = document.createElement("p");
+        }
+        return currentParagraph;
+      },
+      flush() {
+        if (currentParagraph && currentParagraph.textContent.replace(/ /g, " ").trim() !== "") {
+          output.appendChild(currentParagraph);
+        }
+        currentParagraph = null;
+      },
+    };
+  };
+
+  // Appends exactly one source node (text or an inline-ish element) into
+  // the paragraph currently being built.
+  const sanitizeAppendInline = (node, state) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (node.textContent) {
+        state.getParagraph().appendChild(document.createTextNode(node.textContent));
+      }
+      return;
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return;
+    }
+
+    const tag = node.tagName.toLowerCase();
+
+    if (tag === "br") {
+      state.getParagraph().appendChild(document.createElement("br"));
+      return;
+    }
+
+    if (SANITIZE_INLINE_MARKS[tag]) {
+      const clean = document.createElement(SANITIZE_INLINE_MARKS[tag]);
+      state.getParagraph().appendChild(clean);
+      sanitizeWalkInlineChildrenInto(node, clean);
+      return;
+    }
+
+    if (tag === "a") {
+      const href = node.getAttribute("href") || "";
+      if (href) {
+        const clean = document.createElement("a");
+        clean.setAttribute("href", href);
+        clean.setAttribute("target", "_blank");
+        clean.setAttribute("rel", "noopener noreferrer");
+        state.getParagraph().appendChild(clean);
+        sanitizeWalkInlineChildrenInto(node, clean);
+      } else {
+        Array.from(node.childNodes).forEach((child) => sanitizeAppendInline(child, state));
+      }
+      return;
+    }
+
+    if (tag === "img") {
+      const src = node.getAttribute("src") || "";
+      if (src) {
+        const clean = document.createElement("img");
+        clean.setAttribute("src", src);
+        clean.setAttribute("alt", node.getAttribute("alt") || "");
+        clean.className = "editor-image";
+        state.getParagraph().appendChild(clean);
+      }
+      return;
+    }
+
+    // Unrecognized inline wrapper — unwrap, keep processing its children.
+    Array.from(node.childNodes).forEach((child) => sanitizeAppendInline(child, state));
+  };
+
+  // Walks `sourceNode`'s children, emitting clean block-level elements
+  // (tables, lists, headings, table captions) directly into `output`, and
+  // folding everything else (text, inline formatting, and any div/p/section
+  // wrapper) into the paragraph currently under construction. A wrapper div
+  // — however deeply nested, whatever paste tool produced it — is treated
+  // purely as a boundary: its content is recursively processed into the
+  // SAME flat output and paragraph state, so it can reshape structure but
+  // can never cause content to be skipped.
+  const sanitizeProcessChildren = (sourceNode, output, state) => {
+    Array.from(sourceNode.childNodes).forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        sanitizeAppendInline(child, state);
+        return;
+      }
+
+      if (child.nodeType !== Node.ELEMENT_NODE) {
+        return;
+      }
+
+      const tag = child.tagName.toLowerCase();
+
+      if (tag === "table") {
+        state.flush();
+        const clean = sanitizeBuildCleanTable(child);
+        if (clean) {
+          output.appendChild(clean);
+        }
+        return;
+      }
+
+      if (tag === "ul" || tag === "ol") {
+        state.flush();
+        const clean = sanitizeBuildCleanList(child, tag);
+        if (clean) {
+          output.appendChild(clean);
+        }
+        return;
+      }
+
+      if (/^h[1-6]$/.test(tag)) {
+        state.flush();
+        const heading = document.createElement(tag);
+        sanitizeWalkInlineChildrenInto(child, heading);
+        if (heading.textContent.trim()) {
+          output.appendChild(heading);
+        }
+        return;
+      }
+
+      if (tag === "p" && child.classList.contains("table-caption")) {
+        state.flush();
+        const caption = document.createElement("p");
+        caption.className = "table-caption";
+        sanitizeWalkInlineChildrenInto(child, caption);
+        if (caption.textContent.trim()) {
+          output.appendChild(caption);
+        }
+        return;
+      }
+
+      if (SANITIZE_BLOCK_BOUNDARY_TAGS.has(tag)) {
+        state.flush();
+        sanitizeProcessChildren(child, output, state);
+        state.flush();
+        return;
+      }
+
+      sanitizeAppendInline(child, state);
+    });
+  };
+
+  const sanitizeArticleHtml = (html) => {
+    const source = document.createElement("div");
+    source.innerHTML = String(html || "");
+    const output = document.createElement("div");
+    const state = sanitizeCreateParagraphState(output);
+    sanitizeProcessChildren(source, output, state);
+    state.flush();
+    return output.innerHTML.trim();
+  };
+
+  // Applies the sanitizer to a live editor root, replacing its content with
+  // the cleaned version and returning the cleaned HTML string.
+  const sanitizeEditorContent = (root = field.bodyEditor) => {
+    if (!root) {
+      return "";
+    }
+
+    const cleaned = sanitizeArticleHtml(root.innerHTML);
+    root.innerHTML = cleaned;
+    return cleaned;
+  };
+
+  // Moves the caret to the end of the editor's content. Used after a paste
+  // is sanitized (which replaces the editor's innerHTML wholesale, losing
+  // whatever caret position existed) so typing can continue naturally.
+  const placeCaretAtEditorEnd = (root = field.bodyEditor) => {
+    if (!root) {
+      return;
+    }
+
+    const range = document.createRange();
+    range.selectNodeContents(root);
+    range.collapse(false);
+
+    const selection = window.getSelection();
+    if (!selection) {
+      return;
+    }
+
+    selection.removeAllRanges();
+    selection.addRange(range);
   };
 
   const getSelectedText = () => {
@@ -1204,9 +1464,7 @@
     setSelectedTeams(parseTeamsInput(article.teams || []));
     field.body.value = normalizedBodyHtml;
     field.bodyEditor.innerHTML = normalizedBodyHtml;
-    normalizeEditorLinks(field.bodyEditor);
-    normalizeEditorTables(field.bodyEditor);
-    stripPresentationalFormatting(field.bodyEditor);
+    sanitizeEditorContent(field.bodyEditor);
     syncGenerateSlugButtonState();
     updateTableActionState();
     setAdminView("article");
@@ -1349,9 +1607,7 @@
     setText(saveError, "", false);
 
     try {
-      normalizeEditorLinks(field.bodyEditor);
-      normalizeEditorTables(field.bodyEditor);
-      stripPresentationalFormatting(field.bodyEditor);
+      sanitizeEditorContent(field.bodyEditor);
       const cleanedBodyHtml = stripLegacyTickerParagraphFromBody(field.bodyEditor.innerHTML.trim());
       field.bodyEditor.innerHTML = cleanedBodyHtml;
       field.body.value = cleanedBodyHtml;
@@ -1561,9 +1817,8 @@
       field.bodyEditor.addEventListener("keyup", updateTableActionState);
       field.bodyEditor.addEventListener("paste", () => {
         window.setTimeout(() => {
-          normalizeEditorLinks(field.bodyEditor);
-          normalizeEditorTables(field.bodyEditor);
-          stripPresentationalFormatting(field.bodyEditor);
+          sanitizeEditorContent(field.bodyEditor);
+          placeCaretAtEditorEnd(field.bodyEditor);
           field.body.value = stripLegacyTickerParagraphFromBody(field.bodyEditor.innerHTML || "");
           writeDraftToStorage();
           updateTableActionState();
