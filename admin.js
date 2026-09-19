@@ -199,6 +199,7 @@
     field.bodyEditor.innerHTML = normalizedBodyHtml;
     normalizeEditorLinks(field.bodyEditor);
     normalizeEditorTables(field.bodyEditor);
+    stripPresentationalFormatting(field.bodyEditor);
     syncGenerateSlugButtonState();
     updateTableActionState();
   };
@@ -557,6 +558,40 @@
         table.parentNode?.insertBefore(wrap, table);
         wrap.appendChild(table);
       }
+    });
+  };
+
+  // Attributes that let pasted content (from Word, Google Docs, or another
+  // webpage) carry its own font/color/size along with the text, overriding
+  // this site's CSS. normalizeEditorTables already strips these from
+  // anything inside a <table> — this does the same for the rest of the
+  // article body, which previously had no sanitization at all. That gap is
+  // why a pasted paragraph could render in a different font than text typed
+  // directly into the editor, even within the same article.
+  const PRESENTATIONAL_ATTRIBUTES = ["style", "face", "color", "size", "bgcolor"];
+
+  const stripPresentationalFormatting = (root = field.bodyEditor) => {
+    if (!root) {
+      return;
+    }
+
+    const nodes = [root, ...root.querySelectorAll("*")];
+    nodes.forEach((node) => {
+      PRESENTATIONAL_ATTRIBUTES.forEach((attr) => node.removeAttribute(attr));
+    });
+
+    // A <font> tag with no attributes left has no visual effect, but unwrap
+    // it anyway so empty legacy tags don't linger in the saved markup.
+    root.querySelectorAll("font").forEach((fontNode) => {
+      const parent = fontNode.parentNode;
+      if (!parent) {
+        return;
+      }
+
+      while (fontNode.firstChild) {
+        parent.insertBefore(fontNode.firstChild, fontNode);
+      }
+      parent.removeChild(fontNode);
     });
   };
 
@@ -1171,6 +1206,7 @@
     field.bodyEditor.innerHTML = normalizedBodyHtml;
     normalizeEditorLinks(field.bodyEditor);
     normalizeEditorTables(field.bodyEditor);
+    stripPresentationalFormatting(field.bodyEditor);
     syncGenerateSlugButtonState();
     updateTableActionState();
     setAdminView("article");
@@ -1315,6 +1351,7 @@
     try {
       normalizeEditorLinks(field.bodyEditor);
       normalizeEditorTables(field.bodyEditor);
+      stripPresentationalFormatting(field.bodyEditor);
       const cleanedBodyHtml = stripLegacyTickerParagraphFromBody(field.bodyEditor.innerHTML.trim());
       field.bodyEditor.innerHTML = cleanedBodyHtml;
       field.body.value = cleanedBodyHtml;
@@ -1526,6 +1563,7 @@
         window.setTimeout(() => {
           normalizeEditorLinks(field.bodyEditor);
           normalizeEditorTables(field.bodyEditor);
+          stripPresentationalFormatting(field.bodyEditor);
           field.body.value = stripLegacyTickerParagraphFromBody(field.bodyEditor.innerHTML || "");
           writeDraftToStorage();
           updateTableActionState();
