@@ -787,12 +787,18 @@
   // deeper inside a single outer wrapper div, nothing inside it ever gets
   // converted — it silently falls back to the page's base font and default
   // sizing instead of the article's intended typography. This flattens any
-  // div that exists purely as a structural wrapper (no class of its own, no
-  // meaningful block content — just more div/p children) so real content
-  // rises up to become direct children of .post-body, where the existing
-  // conversion logic can actually reach it. Divs with a class (like
-  // stats-table-wrap) or with meaningful block content (images, tables,
-  // lists, headings) are left alone.
+  // div that exists purely as a structural wrapper (no class of its own, and
+  // every DIRECT child is itself just another div or paragraph) so real
+  // content rises up to become direct children of .post-body, where the
+  // existing conversion logic can actually reach it. A div whose direct
+  // children include a table, image, list, or heading is left alone even if
+  // one of those things also happens to live further down inside one of its
+  // *nested* divs — those nested divs still get their own turn to unwrap
+  // (or correctly stay put) on the next pass. Checking only direct children,
+  // rather than searching the whole subtree, is what makes that possible:
+  // a wrapper around "a bunch of paragraphs plus a table, all as siblings"
+  // still needs to be unwrapped so the paragraphs can become real <p> tags,
+  // even though a table exists somewhere underneath it.
   const unwrapStructuralDivWrappers = (root) => {
     let changed = true;
     let guard = 0;
@@ -810,16 +816,9 @@
           return;
         }
 
-        const hasMeaningfulBlockContent = Boolean(
-          div.querySelector("img, picture, video, iframe, table, ul, ol, blockquote, h1, h2, h3, h4, h5, h6")
-        );
-        if (hasMeaningfulBlockContent) {
-          return;
-        }
-
         const children = Array.from(div.children);
         const isPureStructuralWrapper =
-          children.length > 0 && children.every((child) => child.tagName === "DIV" || child.tagName === "P");
+          children.length > 0 && children.every((child) => ["DIV", "P", "BR"].includes(child.tagName));
 
         if (!isPureStructuralWrapper) {
           return;
