@@ -340,10 +340,21 @@ a:hover {
 
 .main-feed {
   min-width: 0;
+  /* Explicit placement (see .sidebar below for why this matters). */
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .feed-auto-pager {
   height: 1px;
+  /* Without this, this sentinel (an ordinary grid child, sitting between
+     .main-feed and .sidebar in the DOM for the infinite-scroll
+     IntersectionObserver to watch) auto-places into row 1's second column
+     — the slot .sidebar needs — bumping .sidebar down into a new row
+     below the entire article feed instead of beside it. Pinning it to
+     column 1 keeps that slot free for the sidebar. */
+  grid-column: 1;
+  grid-row: 2;
 }
 
 .mobile-latest-list {
@@ -879,6 +890,12 @@ a.tag-chip:hover {
 
 .sidebar {
   min-width: 0;
+  /* Explicit placement, so it always sits beside the feed in row 1's
+     second column regardless of what else lives in .page-content (see
+     .feed-auto-pager above — this is the actual fix for the sidebar only
+     appearing after scrolling past the whole article feed). */
+  grid-column: 2;
+  grid-row: 1;
   /* Own compositing layer so the always-running header ticker animation can't
      suppress this box's repaint until a scroll forces one. */
   transform: translateZ(0);
@@ -1035,6 +1052,24 @@ a.tag-chip:hover {
 @media (max-width: 1000px) {
   .page-content {
     grid-template-columns: 1fr;
+  }
+
+  /* .page-content drops to a single column here, so the explicit two-column
+     placement above (main-feed col 1 / sidebar col 2) has to be reset too —
+     otherwise the grid would implicitly invent a second column just to
+     honor "column 2", instead of stacking the sidebar below the feed. */
+  .main-feed,
+  .feed-auto-pager,
+  .sidebar {
+    grid-column: 1;
+  }
+
+  .feed-auto-pager {
+    grid-row: 2;
+  }
+
+  .sidebar {
+    grid-row: 3;
   }
 }
 
