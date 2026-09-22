@@ -65,11 +65,16 @@ a:hover {
   gap: 0.75rem;
   min-height: 56px;
   position: relative;
+  /* Width of the absolutely-positioned logo on the left. The ticker below
+     reserves this much space (plus a gap) on BOTH sides so it stays centered
+     without ever sliding underneath the logo. */
+  --utility-logo-width: 130px;
+  --utility-logo-gap: 1rem;
 }
 
 .utility-logo {
   display: block;
-  width: min(130px, 34vw);
+  width: min(var(--utility-logo-width), 34vw);
   position: absolute;
   left: 0;
   top: 50%;
@@ -92,7 +97,7 @@ a:hover {
 }
 
 .headline-item {
-  width: min(860px, calc(100% - 180px));
+  width: min(860px, calc(100% - 2 * (var(--utility-logo-width) + var(--utility-logo-gap))));
   min-width: 280px;
 }
 
