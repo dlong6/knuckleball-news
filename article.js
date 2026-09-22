@@ -121,7 +121,7 @@
 			return explicitUrl;
 		}
 
-		return `article.html?slug=${encodeURIComponent(article.slug)}`;
+		return `/articles/${encodeURIComponent(article.slug)}/`;
 	};
 
 	const resolveArticleUrl = (article) =>
@@ -232,6 +232,11 @@
 			return;
 		}
 
+		// A pre-built article page already shows the full article; keep it if loading fails.
+		if (articleView.dataset.prerendered === "true") {
+			return;
+		}
+
 		document.title = "Article Not Found | Knuckleball News";
 		articleView.className = "post-card";
 		articleView.innerHTML = [
@@ -244,6 +249,11 @@
 
 	const renderRecentLinks = (articles, currentSlug) => {
 		if (!recentLinks) {
+			return;
+		}
+
+		// Keep the pre-built links if the live list couldn't be loaded.
+		if (!articles.length && recentLinks.querySelector("a")) {
 			return;
 		}
 
@@ -273,7 +283,7 @@
 	};
 
 	const showRecentLinksLoading = () => {
-		if (!recentLinks) {
+		if (!recentLinks || recentLinks.querySelector("a")) {
 			return;
 		}
 
@@ -469,6 +479,27 @@
 		});
 	};
 
+	// Point search engines at the clean /articles/<slug>/ address and set a description.
+	const updateSeoTags = (article) => {
+		const head = document.head;
+		let canonical = head.querySelector('link[rel="canonical"]');
+		if (!canonical) {
+			canonical = document.createElement("link");
+			canonical.rel = "canonical";
+			head.appendChild(canonical);
+		}
+		canonical.href = `https://knuckleballnews.com/articles/${encodeURIComponent(article.slug)}/`;
+
+		let description = head.querySelector('meta[name="description"]');
+		if (!description) {
+			description = document.createElement("meta");
+			description.name = "description";
+			head.appendChild(description);
+		}
+		const text = (article.summary || window.KBData.htmlToPlainText(article.body_html || "")).replace(/\s+/g, " ").trim();
+		description.content = text.length > 155 ? `${text.slice(0, 152).trim()}...` : text;
+	};
+
 	const renderArticle = (article, nextArticle) => {
 		if (!articleView) {
 			return;
@@ -554,13 +585,16 @@
 		normalizePostBodyLinks(articleView);
 
 		document.title = `${article.title} | Knuckleball News`;
+		updateSeoTags(article);
 	};
 
 	const setupPage = async () => {
 		bindInstagramShare();
 
 		const params = new URLSearchParams(window.location.search);
-		const slug = window.KBData.toSlug(params.get("slug") || "");
+		const slug = window.KBData.toSlug(
+			params.get("slug") || (articleView && articleView.dataset.slug) || ""
+		);
 		if (!slug) {
 			renderNotFound();
 			return;

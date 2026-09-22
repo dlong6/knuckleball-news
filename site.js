@@ -74,7 +74,7 @@
 
       const legacyUrl = card.querySelector("h2 a")?.getAttribute("href") || "";
       const resolvedUrl =
-        legacyUrl && legacyUrl !== "#" ? legacyUrl : `article.html?slug=${encodeURIComponent(slug)}`;
+        legacyUrl && legacyUrl !== "#" ? legacyUrl : `/articles/${encodeURIComponent(slug)}/`;
 
       return {
         id: null,
@@ -205,7 +205,7 @@
       return explicitUrl;
     }
 
-    return `article.html?slug=${encodeURIComponent(article.slug)}`;
+    return `/articles/${encodeURIComponent(article.slug)}/`;
   };
 
   const resolveArticleUrl = (article) =>
