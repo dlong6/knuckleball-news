@@ -14,6 +14,7 @@
   const updateHeadlineViewButton = document.querySelector("#update-headline-view-button");
   const articleEditorPanel = document.querySelector("#article-editor-panel");
   const closeArticleEditorButton = document.querySelector("#close-article-editor-button");
+  const articleEditorTitle = document.querySelector("#article-editor-title");
   const headlineEditorPanel = document.querySelector("#headline-editor-panel");
   const closeHeadlineEditorButton = document.querySelector("#close-headline-editor-button");
   const headlineForm = document.querySelector("#headline-form");
@@ -199,6 +200,33 @@
     }
   };
 
+  // Editor heading: "Editing: <title>" for an existing article, otherwise the
+  // default, so it's obvious which article is open.
+  const updateEditorHeading = () => {
+    if (!articleEditorTitle) {
+      return;
+    }
+    const title = String(field.title.value || "").trim();
+    articleEditorTitle.textContent = field.id.value
+      ? `Editing: ${title || "Untitled article"}`
+      : "Create or Edit Article";
+  };
+
+  // Bring the editor into view and briefly highlight it.
+  const revealArticleEditor = () => {
+    if (!articleEditorPanel) {
+      return;
+    }
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    articleEditorPanel.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    field.title.focus({ preventScroll: true });
+
+    articleEditorPanel.classList.remove("editor-panel-flash");
+    // Restart the highlight animation if Edit is clicked again.
+    void articleEditorPanel.offsetWidth;
+    articleEditorPanel.classList.add("editor-panel-flash");
+  };
+
   const hydrateEditorFromState = (state) => {
     field.id.value = String(state.id || "");
     field.title.value = String(state.title || "");
@@ -216,6 +244,7 @@
     sanitizeEditorContent(field.bodyEditor);
     syncGenerateSlugButtonState();
     updateTableActionState();
+    updateEditorHeading();
   };
 
   const restoreDraftFromStorage = () => {
@@ -256,6 +285,7 @@
     field.bodyEditor.innerHTML = "";
     syncGenerateSlugButtonState();
     updateTableActionState();
+    updateEditorHeading();
     setText(saveStatus, "", false);
     setText(saveError, "", false);
 
@@ -1484,9 +1514,11 @@
     syncGenerateSlugButtonState();
     updateTableActionState();
     setAdminView("article");
+    updateEditorHeading();
     setText(saveStatus, "Editing article", true);
     setText(saveError, "", false);
     writeDraftToStorage();
+    revealArticleEditor();
   };
 
   const createActionButton = (text, className, onClick) => {

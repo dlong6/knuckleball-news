@@ -323,7 +323,7 @@
 
     const kicker = document.createElement("p");
     kicker.className = "post-kicker";
-    kicker.textContent = index === 0 ? "New Post" : "Recent Post";
+    kicker.textContent = index === 0 ? "New Post" : "News Article";
 
     const heading = document.createElement("h2");
     const link = document.createElement("a");

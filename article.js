@@ -33,13 +33,60 @@
 	const sortArticlesNewestFirst = (articles) =>
 		[...articles].sort((left, right) => getSortableTimestamp(right) - getSortableTimestamp(left));
 
-	const getNextArticle = (articles, currentSlug) => {
+	// Articles are sorted newest first. "Previous" is the next newer article,
+	// "Next" is the next older one (the same direction as reading down the
+	// home page feed).
+	const getAdjacentArticles = (articles, currentSlug) => {
 		const index = articles.findIndex((article) => article.slug === currentSlug);
 		if (index === -1) {
+			return { previous: null, next: null };
+		}
+
+		return {
+			previous: articles[index - 1] || null,
+			next: articles[index + 1] || null,
+		};
+	};
+
+	const createArticlePager = ({ previous, next }) => {
+		if (!previous && !next) {
 			return null;
 		}
 
-		return articles[index + 1] || null;
+		const nav = document.createElement("nav");
+		nav.className = "article-pager";
+		nav.setAttribute("aria-label", "More articles");
+
+		const buildLink = (article, direction) => {
+			const link = document.createElement("a");
+			link.className = `article-pager-link article-pager-${direction}`;
+			link.href = createArticleUrl(article);
+			link.rel = direction === "previous" ? "prev" : "next";
+
+			const label = document.createElement("span");
+			label.className = "article-pager-label";
+			label.textContent = direction === "previous" ? "\u2190 Previous" : "Next \u2192";
+
+			const title = document.createElement("span");
+			title.className = "article-pager-title";
+			title.textContent = article.title;
+
+			link.appendChild(label);
+			link.appendChild(title);
+			return link;
+		};
+
+		// Keep the layout stable when one side is missing (newest/oldest article).
+		const placeholder = () => {
+			const empty = document.createElement("span");
+			empty.className = "article-pager-empty";
+			empty.setAttribute("aria-hidden", "true");
+			return empty;
+		};
+
+		nav.appendChild(previous ? buildLink(previous, "previous") : placeholder());
+		nav.appendChild(next ? buildLink(next, "next") : placeholder());
+		return nav;
 	};
 
 	const createTag = (text, className) => {
@@ -500,7 +547,7 @@
 		description.content = text.length > 155 ? `${text.slice(0, 152).trim()}...` : text;
 	};
 
-	const renderArticle = (article, nextArticle) => {
+	const renderArticle = (article, adjacentArticles) => {
 		if (!articleView) {
 			return;
 		}
@@ -567,17 +614,9 @@
 		articleView.appendChild(createShareActions(article));
 		articleView.appendChild(createTeamLabelsSection(teams));
 
-		if (nextArticle) {
-			const nextWrap = document.createElement("div");
-			nextWrap.className = "load-next-article-wrap";
-
-			const nextButton = document.createElement("a");
-			nextButton.className = "load-next-article-button";
-			nextButton.href = createArticleUrl(nextArticle);
-			nextButton.textContent = "Load Next Article";
-
-			nextWrap.appendChild(nextButton);
-			articleView.appendChild(nextWrap);
+		const pager = createArticlePager(adjacentArticles || {});
+		if (pager) {
+			articleView.appendChild(pager);
 		}
 
 		normalizeArticleTables(articleView);
@@ -623,8 +662,7 @@
 			}
 
 			const sortedArticles = await publishedArticlesPromise;
-			const nextArticle = getNextArticle(sortedArticles, slug);
-			renderArticle(article, nextArticle);
+			renderArticle(article, getAdjacentArticles(sortedArticles, slug));
 		} catch (error) {
 			console.error("Unable to load article", error);
 			renderNotFound();

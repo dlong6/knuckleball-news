@@ -416,6 +416,27 @@ button:hover {
   color: #29415f;
 }
 
+/* Brief highlight when an article is opened with Edit. */
+@keyframes editor-panel-flash {
+  0% { background-color: #fff4cf; box-shadow: 0 0 0 3px #f3c451; }
+  100% { background-color: transparent; box-shadow: 0 0 0 3px transparent; }
+}
+
+.editor-panel-flash {
+  animation: editor-panel-flash 1.6s ease-out;
+}
+
+/* Leave a little space above the editor when Edit scrolls to it. */
+#article-editor-panel {
+  scroll-margin-top: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-panel-flash {
+    animation: none;
+  }
+}
+
 .subpanel-head {
   display: flex;
   align-items: center;

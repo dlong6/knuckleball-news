@@ -292,7 +292,7 @@
     card.dataset.teams = (article.teams || []).join(", ");
 
     kicker.className = "post-kicker";
-    kicker.textContent = index === 0 ? "New Post" : "Recent Post";
+    kicker.textContent = index === 0 ? "New Post" : "News Article";
 
     heading.className = "post-title";
     titleLink.href = createArticleUrl(article);
