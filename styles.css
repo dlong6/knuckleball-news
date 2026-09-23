@@ -109,7 +109,7 @@ a:hover {
 .headline-track {
   display: flex;
   width: max-content;
-  animation: headline-scroll var(--headline-duration, 14s) linear infinite;
+  /* Scrolling is driven by ticker.js (pixel-snapped so the text stays sharp). */
   will-change: transform;
 }
 
@@ -129,22 +129,6 @@ a:hover {
 
 .headline-prefix {
   font-weight: 700;
-}
-
-@keyframes headline-scroll {
-  from {
-    transform: translateX(0);
-  }
-
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .headline-track {
-    animation: none;
-  }
 }
 
 .masthead {
@@ -1149,14 +1133,40 @@ a.tag-chip:hover {
     gap: 0.2rem;
   }
 
-  /* Four nav links plus the mini logo: tighten spacing so they stay on one row. */
-  .primary-nav a {
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
+  /* Four nav links plus the mini logo: keep them on ONE row on phones.
+     The links keep their size; the mini logo shrinks a little if the
+     screen is too narrow, instead of wrapping onto a second row. */
+  .nav-inner {
+    flex-wrap: nowrap;
+    gap: 0;
   }
 
-  .nav-inner {
-    gap: 0.1rem;
+  .primary-nav a {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding-left: 0.45rem;
+    padding-right: 0.45rem;
+  }
+
+  .primary-nav a.nav-mini-logo {
+    flex: 0 1 auto;
+    min-width: 0;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+
+  .nav-mini-logo img {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 360px) {
+  /* The narrowest phones: slightly smaller nav text so the logo still fits. */
+  .primary-nav a {
+    font-size: 0.7rem;
+    letter-spacing: 0.02em;
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
   }
 }
 
