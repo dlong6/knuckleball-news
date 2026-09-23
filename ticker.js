@@ -12,50 +12,6 @@
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
-  const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-
-  // The ticker is moved from JavaScript instead of a CSS animation so every
-  // frame can be snapped to a whole screen pixel. A CSS animation lands on
-  // fractional pixels (e.g. 1.7px per frame), which makes the browser blend
-  // each letter across neighbouring pixels - that's what looked blurry.
-  let copyWidth = 0;
-  let speedPxPerSecond = 0;
-  let offset = 0;
-  let lastFrameTime = null;
-  let frameId = null;
-
-  const stopTicker = (track) => {
-    if (frameId !== null) {
-      window.cancelAnimationFrame(frameId);
-      frameId = null;
-    }
-    lastFrameTime = null;
-    offset = 0;
-    if (track) {
-      track.style.transform = "translate3d(0, 0, 0)";
-    }
-  };
-
-  const step = (now) => {
-    const track = getHeadlineTrack();
-    if (!track || copyWidth <= 0) {
-      frameId = null;
-      return;
-    }
-
-    // Cap the time step so returning to a background tab doesn't cause a jump.
-    const elapsedSeconds = lastFrameTime === null ? 0 : Math.min((now - lastFrameTime) / 1000, 0.1);
-    lastFrameTime = now;
-    offset = (offset + speedPxPerSecond * elapsedSeconds) % copyWidth;
-
-    // Snap to the nearest physical pixel (half a CSS pixel on Retina screens).
-    const pixelRatio = window.devicePixelRatio || 1;
-    const snapped = Math.round(offset * pixelRatio) / pixelRatio;
-    track.style.transform = `translate3d(${-snapped}px, 0, 0)`;
-
-    frameId = window.requestAnimationFrame(step);
-  };
-
   const syncTickerMotion = () => {
     const track = getHeadlineTrack();
     const headlineLinks = getHeadlineLinks();
@@ -66,31 +22,19 @@
     }
 
     const text = String(firstCopy.textContent || "").trim();
-    if (!text || reducedMotionQuery.matches) {
-      stopTicker(track);
+    if (!text) {
+      track.style.animation = "none";
+      track.style.transform = "translateX(0)";
       return;
     }
 
-    // Two identical copies sit side by side; moving by one copy's width and
-    // wrapping around makes the loop seamless.
-    copyWidth = firstCopy.getBoundingClientRect().width;
-    if (copyWidth <= 0) {
-      stopTicker(track);
-      return;
-    }
-
-    // Same speed rules as before: a base speed, with each full pass kept
-    // between 8 and 22 seconds.
     const isMobile = window.matchMedia("(max-width: 760px)").matches;
-    const baseSpeed = isMobile ? MOBILE_SCROLL_SPEED_PX_PER_SECOND : DESKTOP_SCROLL_SPEED_PX_PER_SECOND;
-    const durationSeconds = clamp(copyWidth / baseSpeed, MIN_TICKER_DURATION_SECONDS, MAX_TICKER_DURATION_SECONDS);
-    speedPxPerSecond = copyWidth / durationSeconds;
+    const speed = isMobile ? MOBILE_SCROLL_SPEED_PX_PER_SECOND : DESKTOP_SCROLL_SPEED_PX_PER_SECOND;
+    const travelDistance = firstCopy.scrollWidth;
+    const durationSeconds = clamp(travelDistance / speed, MIN_TICKER_DURATION_SECONDS, MAX_TICKER_DURATION_SECONDS);
 
-    offset %= copyWidth;
-    if (frameId === null) {
-      lastFrameTime = null;
-      frameId = window.requestAnimationFrame(step);
-    }
+    track.style.setProperty("--headline-duration", `${durationSeconds.toFixed(2)}s`);
+    track.style.animation = "";
   };
 
   const renderTickerText = (tickerText) => {
@@ -209,19 +153,6 @@
   });
 
   window.addEventListener("resize", syncTickerMotion);
-
-  // Web fonts can finish loading after the first render and change the text
-  // width, so measure again once they're ready.
-  if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(syncTickerMotion).catch(() => {});
-  }
-
-  const onReducedMotionChange = () => syncTickerMotion();
-  if (typeof reducedMotionQuery.addEventListener === "function") {
-    reducedMotionQuery.addEventListener("change", onReducedMotionChange);
-  } else if (typeof reducedMotionQuery.addListener === "function") {
-    reducedMotionQuery.addListener(onReducedMotionChange);
-  }
 
   fixInitialScrollPosition();
 

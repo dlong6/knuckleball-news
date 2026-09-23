@@ -109,26 +109,41 @@ a:hover {
 .headline-track {
   display: flex;
   width: max-content;
-  /* Scrolling is driven by ticker.js (pixel-snapped so the text stays sharp). */
+  animation: headline-scroll var(--headline-duration, 14s) linear infinite;
   will-change: transform;
 }
 
 .headline-copy {
-  /* White on the blue ticker bar at every screen size. The heavier weight
-     and grayscale smoothing keep the scrolling white text crisp instead of
-     fuzzy (most noticeable on Macs). */
+  /* White on the blue ticker bar at every screen size. Regular weight (no
+     bold) keeps the scrolling text crisper; grayscale smoothing helps on Macs. */
   color: #ffffff;
   white-space: nowrap;
   display: block;
   font-size: 0.88rem;
-  font-weight: 600;
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   padding-right: 3.25rem;
 }
 
 .headline-prefix {
-  font-weight: 700;
+  font-weight: 400;
+}
+
+@keyframes headline-scroll {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .headline-track {
+    animation: none;
+  }
 }
 
 .masthead {
