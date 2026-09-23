@@ -363,7 +363,7 @@ a:hover {
 }
 
 @media (max-width: 760px) {
-  .main-feed .post-card[data-prerendered="true"] {
+  .prerendered-home-card {
     display: none;
   }
 

@@ -322,7 +322,7 @@ function homeCard(article, index) {
     chips.push('<a class="tag-chip tag-series" href="category.html?series=true" target="_blank" rel="noopener noreferrer">Series</a>');
   }
 
-  return `<article class="post-card" id="${escapeHtml(article.slug)}" data-prerendered="true" data-published-at="${escapeHtml(article.published_at)}" data-category="${escapeHtml(article.category)}" data-series="${article.is_series ? "true" : "false"}" data-teams="${escapeHtml(article.teams.join(", "))}">
+  return `<article class="post-card prerendered-home-card" id="${escapeHtml(article.slug)}" data-prerendered="true" data-published-at="${escapeHtml(article.published_at)}" data-category="${escapeHtml(article.category)}" data-series="${article.is_series ? "true" : "false"}" data-teams="${escapeHtml(article.teams.join(", "))}">
           <p class="post-kicker">${index === 0 ? "New Post" : "News Article"}</p>
           <h2 class="post-title"><a href="${articlePath(article.slug)}">${escapeHtml(article.title)}</a></h2>
           <div class="post-meta-row"><p class="post-meta">By ${escapeHtml(article.author)} | ${escapeHtml(formatDateTime(article.published_at))}</p><div class="post-labels" aria-label="Article labels"${chips.length ? "" : " hidden"}>${chips.join("")}</div></div>
