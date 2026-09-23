@@ -1,10 +1,4 @@
 :root {
-  /* ---- Ticker text weight (edit these to change how bold it looks) ----
-     400 = regular (thinnest)   500 = medium   600 = semi-bold   700 = bold
-     Thinner usually looks sharper while the text scrolls. */
-  --ticker-text-weight: 500;
-  --ticker-label-weight: 700; /* the "LATEST:" label */
-
   --page-bg: #eef1f4;
   --shell-bg: #ffffff;
   --ink: #2b3b4b;
@@ -120,21 +114,21 @@ a:hover {
 }
 
 .headline-copy {
-  /* White on the blue ticker bar at every screen size. Grayscale smoothing
-     keeps scrolling white text crisper (most noticeable on Macs). The weight
-     is set at the top of this file (--ticker-text-weight). */
+  /* White on the blue ticker bar at every screen size. The heavier weight
+     and grayscale smoothing keep the scrolling white text crisp instead of
+     fuzzy (most noticeable on Macs). */
   color: #ffffff;
   white-space: nowrap;
   display: block;
   font-size: 0.88rem;
-  font-weight: var(--ticker-text-weight);
+  font-weight: 600;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   padding-right: 3.25rem;
 }
 
 .headline-prefix {
-  font-weight: var(--ticker-label-weight);
+  font-weight: 700;
 }
 
 .masthead {
