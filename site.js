@@ -35,13 +35,18 @@
   const sortArticlesNewestFirst = (articles) =>
     [...articles].sort((left, right) => getSortableTimestamp(right) - getSortableTimestamp(left));
 
-  const extractEmbeddedHomepageArticles = () => {
+  // Articles already written into the page. The daily publish step pre-builds
+  // the latest articles into the home page (marked data-prerendered) so there's
+  // no "Loading" message; those are only used if the live list can't load, so
+  // an article unpublished since the last build doesn't linger.
+  const extractEmbeddedHomepageArticles = ({ includePrerendered = false } = {}) => {
     if (!mainFeed) {
       return [];
     }
 
     return Array.from(mainFeed.querySelectorAll(".post-card"))
       .filter((card) => card.querySelector("h2 a"))
+      .filter((card) => includePrerendered || card.dataset.prerendered !== "true")
       .map((card, index) => {
       const title = card.querySelector("h2 a")?.textContent?.trim();
       if (!title) {
@@ -51,9 +56,11 @@
       const metaMatch = metaText.match(/^By\s+(.+?)\s*\|\s*(.+)$/i);
       const author = metaMatch ? metaMatch[1].trim() : "Knuckleball News";
       const dateText = metaMatch ? metaMatch[2].trim() : "";
-      const publishedAt = Number.isFinite(Date.parse(dateText))
-        ? new Date(dateText).toISOString()
-        : "1970-01-01T00:00:00.000Z";
+      const publishedAt = Number.isFinite(Date.parse(card.dataset.publishedAt || ""))
+        ? new Date(card.dataset.publishedAt).toISOString()
+        : Number.isFinite(Date.parse(dateText))
+          ? new Date(dateText).toISOString()
+          : "1970-01-01T00:00:00.000Z";
 
       const slugFromId = card.id && card.id !== "top-story" ? card.id : "";
       const slug = slugFromId || window.KBData.toSlug(title) || `legacy-article-${index + 1}`;
@@ -1040,8 +1047,13 @@
 
   const renderSupabaseHomepage = async () => {
     const embeddedArticles = extractEmbeddedHomepageArticles();
+    const prerenderedArticles = extractEmbeddedHomepageArticles({ includePrerendered: true });
     const publishedArticles = await window.KBData.fetchPublishedArticles();
-    allPublishedArticles = mergeHomepageArticles(publishedArticles, embeddedArticles);
+    // If the live list came back empty (e.g. a Supabase hiccup on a first
+    // visit), keep showing the pre-built articles instead of "No articles".
+    allPublishedArticles = publishedArticles.length
+      ? mergeHomepageArticles(publishedArticles, embeddedArticles)
+      : sortArticlesNewestFirst(prerenderedArticles);
 
     ensureAutoPager();
     syncSidebarLinks(allPublishedArticles);
@@ -1049,7 +1061,7 @@
   };
 
   const setupFallbackHomepage = () => {
-    allPublishedArticles = extractEmbeddedHomepageArticles();
+    allPublishedArticles = sortArticlesNewestFirst(extractEmbeddedHomepageArticles({ includePrerendered: true }));
     ensureAutoPager();
     syncSidebarLinks(allPublishedArticles);
     setActiveArticles(allPublishedArticles, true);

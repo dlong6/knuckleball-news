@@ -65,7 +65,7 @@
 
 			const label = document.createElement("span");
 			label.className = "article-pager-label";
-			label.textContent = direction === "previous" ? "\u2190 Previous" : "Next \u2192";
+			label.textContent = direction === "previous" ? "< Previous" : "Next >";
 
 			const title = document.createElement("span");
 			title.className = "article-pager-title";

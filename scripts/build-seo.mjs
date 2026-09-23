@@ -4,6 +4,8 @@
 // 2. Downloads every published article from Supabase
 // 3. Writes a real HTML page for each one at /articles/<slug>/
 // 4. Writes an "All Articles" page at /articles/ and a sitemap.xml
+// 5. Writes the home page with the latest articles already in it, so
+//    visitors and search engines never see "Loading latest articles..."
 //
 // Run by .github/workflows/publish-site.yml. Needs Node 18 or newer.
 
@@ -113,6 +115,8 @@ async function fetchArticles({ supabaseUrl, supabaseAnonKey }) {
       title: String(row.title || "").trim(),
       author: String(row.author || "").trim() || SITE_NAME,
       category: String(row.category || "").trim(),
+      is_series: row.is_series === true || row.is_series === "true",
+      teams: Array.isArray(row.teams) ? row.teams.map((t) => String(t || "").trim()).filter(Boolean) : [],
       summary: String(row.summary || "").trim(),
       body_html: String(row.body_html || "").trim(),
       published_at: row.published_at || row.created_at,
@@ -164,12 +168,34 @@ function withHead(template, tags) {
     .replace(/<meta charset="UTF-8" \/>/, `<meta charset="UTF-8" />\n    ${tags}`);
 }
 
+// Same list the live sidebar shows (article.js): the 12 newest articles,
+// with the current one included and marked, so nothing jumps when the page
+// refreshes the list after loading.
 function recentLinks(articles, currentSlug) {
   return articles
-    .filter((a) => a.slug !== currentSlug)
     .slice(0, 12)
-    .map((a) => `<li><a href="${articlePath(a.slug)}">${escapeHtml(a.title)}</a></li>`)
+    .map((a) => {
+      const current = a.slug === currentSlug ? ' aria-current="page"' : "";
+      return `<li><a href="${articlePath(a.slug)}"${current}>${escapeHtml(a.title)}</a></li>`;
+    })
     .join("\n          ");
+}
+
+// Previous (newer) / Next (older) links, same markup as article.js builds.
+function articlePager(articles, currentSlug) {
+  const index = articles.findIndex((a) => a.slug === currentSlug);
+  if (index === -1) return "";
+  const previous = articles[index - 1];
+  const next = articles[index + 1];
+  if (!previous && !next) return "";
+
+  const link = (a, direction) =>
+    `<a class="article-pager-link article-pager-${direction}" href="${articlePath(a.slug)}" rel="${direction === "previous" ? "prev" : "next"}">` +
+    `<span class="article-pager-label">${direction === "previous" ? "&lt; Previous" : "Next &gt;"}</span>` +
+    `<span class="article-pager-title">${escapeHtml(a.title)}</span></a>`;
+  const empty = '<span class="article-pager-empty" aria-hidden="true"></span>';
+
+  return `<nav class="article-pager" aria-label="More articles">${previous ? link(previous, "previous") : empty}${next ? link(next, "next") : empty}</nav>`;
 }
 
 function buildArticlePage(template, article, articles) {
@@ -207,6 +233,7 @@ function buildArticlePage(template, article, articles) {
           <div class="post-meta-row"><p class="post-meta">By ${escapeHtml(article.author)} | ${escapeHtml(formatDate(article.published_at))}</p></div>
           ${article.summary ? `<p class="post-summary">${escapeHtml(article.summary)}</p>` : ""}
           <div class="post-body">${article.body_html}</div>
+          ${articlePager(articles, article.slug)}
         </article>`;
 
   let html = withHead(template, head);
@@ -255,6 +282,86 @@ function buildArchivePage(template, articles) {
   return html;
 }
 
+// ---------- home page ----------
+
+// Must match site.js (the live home page) so nothing shifts when it takes over.
+const HOME_DESKTOP_CARDS = 3; // DESKTOP_INITIAL_VISIBLE_COUNT
+const HOME_MOBILE_ITEMS = 8; // MOBILE_INITIAL_VISIBLE_COUNT
+const HOME_SIDEBAR_LINKS = 12; // SIDEBAR_LINK_LIMIT
+const CATEGORY_CLASSES = {
+  Eephus: "tag-eephus",
+  Wormburner: "tag-wormburner",
+  "Can of Corn": "tag-can-of-corn",
+  "Extra Innings": "tag-extra-innings",
+  Showcase: "tag-showcase",
+};
+
+// Same wording as kb-data.js formatDate, e.g. "September 22, 2026 1:10 PM PDT".
+// Shown in Pacific time; the live page then shows the visitor's own time zone.
+function formatDateTime(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const tz = "America/Los_Angeles";
+  const datePart = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: tz }).format(date);
+  const timePart = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZoneName: "short", timeZone: tz }).format(date);
+  return `${datePart} ${timePart}`;
+}
+
+// Old articles may still contain the legacy ticker paragraph; site.js hides it.
+const stripLegacyTicker = (html) =>
+  String(html || "").replace(/<p\b[^>]*data-wormburner-ticker="true"[^>]*>[\s\S]*?<\/p>/gi, "");
+
+function homeCard(article, index) {
+  const chips = [];
+  if (CATEGORY_CLASSES[article.category]) {
+    chips.push(
+      `<a class="tag-chip ${CATEGORY_CLASSES[article.category]}" href="category.html?category=${encodeURIComponent(article.category)}" target="_blank" rel="noopener noreferrer">${escapeHtml(article.category)}</a>`
+    );
+  }
+  if (article.is_series) {
+    chips.push('<a class="tag-chip tag-series" href="category.html?series=true" target="_blank" rel="noopener noreferrer">Series</a>');
+  }
+
+  return `<article class="post-card" id="${escapeHtml(article.slug)}" data-prerendered="true" data-published-at="${escapeHtml(article.published_at)}" data-category="${escapeHtml(article.category)}" data-series="${article.is_series ? "true" : "false"}" data-teams="${escapeHtml(article.teams.join(", "))}">
+          <p class="post-kicker">${index === 0 ? "New Post" : "News Article"}</p>
+          <h2 class="post-title"><a href="${articlePath(article.slug)}">${escapeHtml(article.title)}</a></h2>
+          <div class="post-meta-row"><p class="post-meta">By ${escapeHtml(article.author)} | ${escapeHtml(formatDateTime(article.published_at))}</p><div class="post-labels" aria-label="Article labels"${chips.length ? "" : " hidden"}>${chips.join("")}</div></div>
+          <div class="post-body">${stripLegacyTicker(article.body_html)}</div>
+        </article>`;
+}
+
+function buildHomePage(template, articles) {
+  const cards = articles.slice(0, HOME_DESKTOP_CARDS).map(homeCard).join("\n        ");
+
+  // Phones show a compact list instead of full cards (see site.js).
+  const mobileItems = articles
+    .slice(0, HOME_MOBILE_ITEMS)
+    .map(
+      (a) => `<li class="mobile-latest-item"><a class="mobile-latest-link" href="${articlePath(a.slug)}">${escapeHtml(a.title)}</a><p class="mobile-latest-meta">${escapeHtml(formatDateTime(a.published_at))} | ${escapeHtml(a.author)}</p></li>`
+    )
+    .join("\n          ");
+
+  const feed = `<section class="main-feed" aria-label="Latest posts">
+        ${cards}
+        <ol class="mobile-latest-list prerendered-mobile-list">
+          ${mobileItems}
+        </ol>
+      </section>`;
+
+  const sidebarLinks = articles
+    .slice(0, HOME_SIDEBAR_LINKS)
+    .map((a) => `<li><a href="${articlePath(a.slug)}">${escapeHtml(a.title)}</a></li>`)
+    .join("\n            ");
+
+  let html = template.replace(/<section class="main-feed" aria-label="Latest posts">[\s\S]*?<\/section>/, feed);
+  html = html.replace(/<ul id="article-links-list"><\/ul>/, `<ul id="article-links-list">\n            ${sidebarLinks}\n          </ul>`);
+
+  if (!html.includes('data-prerendered="true"') || html.includes("Loading latest articles")) {
+    throw new Error("Could not insert articles into index.html; check the main-feed markup.");
+  }
+  return html;
+}
+
 function buildSitemap(articles) {
   const newest = articles[0]?.updated_at;
   const urls = [
@@ -297,7 +404,10 @@ async function main() {
   await fs.writeFile(path.join(OUT, "articles", "index.html"), buildArchivePage(template, articles));
   await fs.writeFile(path.join(OUT, "sitemap.xml"), buildSitemap(articles));
 
-  console.log(`Built ${articles.length} article pages, /articles/ and sitemap.xml into _site/.`);
+  const homeTemplate = await fs.readFile(path.join(ROOT, "index.html"), "utf8");
+  await fs.writeFile(path.join(OUT, "index.html"), buildHomePage(homeTemplate, articles));
+
+  console.log(`Built ${articles.length} article pages, /articles/, the home page and sitemap.xml into _site/.`);
 }
 
 main().catch((error) => {
