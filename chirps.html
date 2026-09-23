@@ -2,13 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="description" content="Knuckleball News is an independent baseball news site covering MLB teams, players and stories." />
+    <meta name="description" content="Every ticker headline that has run across the top of Knuckleball News." />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Team Articles | Knuckleball News</title>
+    <title>Chirps | Knuckleball News</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Merriweather:wght@400;700;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Merriweather:wght@400;700;900&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
@@ -50,22 +50,19 @@
       </nav>
     </header>
 
-    <main class="page-shell page-content">
-      <section class="main-feed" aria-label="Team articles">
-        <article class="post-card team-page-header-card">
-          <p class="post-kicker">Team Coverage</p>
-          <h2 id="team-page-title">Loading team articles...</h2>
-          <p id="team-page-subtitle" class="post-summary"></p>
+    <main class="page-shell page-content headline-archive-page">
+      <section class="main-feed" aria-label="Chirps">
+        <article class="post-card headline-archive-card">
+          <h2>Chirps</h2>
+          <p class="headline-archive-intro">Every ticker headline that has run across the top of the site.</p>
+          <label class="headline-archive-search">
+            <span class="visually-hidden">Search chirps</span>
+            <input id="headline-archive-search" type="search" placeholder="Search chirps" autocomplete="off" />
+          </label>
+          <p id="headline-archive-status" class="headline-archive-status">Loading chirps...</p>
+          <ol id="headline-archive-list" class="headline-archive-list"></ol>
         </article>
-        <div id="team-article-list"></div>
       </section>
-
-      <aside class="sidebar" aria-label="Sidebar modules">
-        <section class="module">
-          <h3>Browse Other Teams</h3>
-          <ul id="team-picker-links"></ul>
-        </section>
-      </aside>
     </main>
 
     <footer class="site-footer">
@@ -90,6 +87,6 @@
     <script src="kb-data.js"></script>
     <script src="ticker.js"></script>
     <script src="teams-nav.js"></script>
-    <script src="team.js"></script>
+    <script src="headlines.js"></script>
   </body>
 </html>

@@ -22,7 +22,7 @@
             <img src="logo_blue.png" alt="Knuckleball News" />
           </a>
           <div class="headline-item">
-            <div class="headline-marquee" aria-label="Today's headline">
+            <div class="headline-marquee" aria-label="Latest chirp">
               <div class="headline-track">
                 <span class="headline-copy"></span>
                 <span class="headline-copy" aria-hidden="true"></span>
@@ -41,8 +41,8 @@
       <nav class="primary-nav">
         <div class="page-shell nav-inner">
           <a href="index.html">Home</a>
+          <a href="chirps.html">Chirps</a>
           <a href="#" data-open-team-modal="true">Search</a>
-          <a href="headlines.html">Headlines</a>
           <a href="mailto:golongathletics@gmail.com">Contact</a>
           <a class="nav-mini-logo" href="admin.html" aria-label="Knuckleball News Admin Login">
             <img src="logo_blue.png" alt="Knuckleball News" />
@@ -85,7 +85,7 @@
           <h2>Quick Actions</h2>
           <div class="manager-actions">
             <button id="create-article-view-button" type="button" class="manager-action-button">Create New Article</button>
-            <button id="update-headline-view-button" type="button" class="manager-action-button">Update Headline</button>
+            <button id="update-headline-view-button" type="button" class="manager-action-button">Manage Chirp</button>
           </div>
         </section>
 
@@ -210,30 +210,41 @@
 
         <section id="headline-editor-panel" class="admin-subpanel" hidden>
           <div class="subpanel-head">
-            <h2>Update Headline</h2>
-            <button id="close-headline-editor-button" type="button" class="editor-close-button" aria-label="Close headline editor">
+            <h2>Manage Chirp</h2>
+            <button id="close-headline-editor-button" type="button" class="editor-close-button" aria-label="Close chirp editor">
               x
             </button>
           </div>
           <form id="headline-form" class="stack-form">
             <label>
-              Ticker Headline
+              Ticker Chirp
               <textarea
                 id="headline-text"
                 name="headline_text"
                 rows="3"
-                placeholder="Enter the headline shown in the top ticker"
+                placeholder="Enter the chirp shown in the top ticker"
               ></textarea>
             </label>
             <div class="form-actions">
-              <button type="submit">Save Headline</button>
+              <button type="submit">Save Chirp</button>
             </div>
             <p id="headline-status" class="form-success" hidden></p>
             <p id="headline-error" class="form-error" hidden></p>
           </form>
         </section>
 
-        <section class="admin-subpanel manager-top-panel">
+        <section id="headline-history-panel" class="admin-subpanel manager-top-panel" hidden>
+          <h2>Previous Chirps</h2>
+          <label class="list-search-wrap" for="headline-history-search">
+            Search Chirps
+            <input id="headline-history-search" type="search" placeholder="Search previous chirps" />
+          </label>
+          <p id="headline-history-status" class="form-success" hidden></p>
+          <p id="headline-history-error" class="form-error" hidden></p>
+          <ul id="headline-history-list" class="article-list headline-history-list"></ul>
+        </section>
+
+        <section id="article-list-panel" class="admin-subpanel manager-top-panel">
           <h2>Existing Articles</h2>
           <label class="list-search-wrap" for="article-list-search">
             Search Articles

@@ -260,7 +260,7 @@ function buildSitemap(articles) {
   const urls = [
     { loc: `${SITE_URL}/`, lastmod: newest },
     { loc: `${SITE_URL}/articles/`, lastmod: newest },
-    { loc: `${SITE_URL}/headlines.html` },
+    { loc: `${SITE_URL}/chirps.html` },
     ...articles.map((a) => ({ loc: `${SITE_URL}${articlePath(a.slug)}`, lastmod: a.updated_at })),
   ];
   const body = urls

@@ -1,4 +1,4 @@
-// Ticker headline archive (headlines.html).
+// Chirps page (chirps.html): archive of every ticker headline.
 // Lists every headline saved to public.ticker_history, newest first,
 // grouped by day, with a search box to filter them.
 (function () {
@@ -43,7 +43,7 @@
 
     if (!headlines.length) {
       const query = searchInput?.value.trim();
-      setStatus(query ? `No headlines match "${query}".` : "No ticker headlines have been archived yet.");
+      setStatus(query ? `No chirps match "${query}".` : "No chirps yet.");
       return;
     }
 
@@ -99,7 +99,7 @@
 
   const load = async () => {
     if (!window.KBData || typeof window.KBData.fetchTickerHistory !== "function") {
-      setStatus("Headlines are unavailable right now.");
+      setStatus("Chirps are unavailable right now.");
       return;
     }
 
@@ -107,8 +107,8 @@
       allHeadlines = await window.KBData.fetchTickerHistory();
       applySearch();
     } catch (error) {
-      console.error("Unable to load ticker headlines", error);
-      setStatus("Headlines couldn't be loaded right now. Please try again later.");
+      console.error("Unable to load chirps", error);
+      setStatus("Chirps couldn't be loaded right now. Please try again later.");
     }
   };
 

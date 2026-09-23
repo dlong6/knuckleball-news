@@ -250,7 +250,7 @@
 
   const formatHeadlineWriteError = (error) => {
     if (!error) {
-      return new Error("Unable to save headline.");
+      return new Error("Unable to save chirp.");
     }
 
     const message = String(error.message || "").toLowerCase();
@@ -265,7 +265,7 @@
 
     if (message.includes("row-level security") || error.code === "42501") {
       return new Error(
-        'Headline save blocked by Supabase Row Level Security. Run the headers RLS policies from SUPABASE_SETUP.md.'
+        'Chirp save blocked by Supabase Row Level Security. Run the headers RLS policies from SUPABASE_SETUP.md.'
       );
     }
 
@@ -466,9 +466,9 @@
     } catch (error) {
       const message = String(error?.message || "").toLowerCase();
       if (error?.code === "42P01" || (message.includes(TICKER_HISTORY_TABLE) && message.includes("does not exist"))) {
-        return 'Ticker updated, but it was not added to the headline archive: table public.ticker_history is missing. Run the SQL in SUPABASE_SETUP.md under "Headline archive".';
+        return 'Ticker updated, but it was not added to Chirps: table public.ticker_history is missing. Run the SQL in SUPABASE_SETUP.md, section 4b.';
       }
-      return `Ticker updated, but it was not added to the headline archive: ${error?.message || "unknown error"}`;
+      return `Ticker updated, but it was not added to Chirps: ${error?.message || "unknown error"}`;
     }
   };
 
@@ -555,6 +555,38 @@
     return normalized;
   };
 
+  // Removes one headline from the archive. Admin-only: the table's security
+  // rules only let signed-in users delete. If those rules block it, Supabase
+  // deletes nothing *without* an error, so we check a row actually went away.
+  const deleteTickerHistoryEntry = async (entryId) => {
+    if (!supabaseClient) {
+      throw new Error("Supabase is not configured.");
+    }
+
+    const {
+      data: { session },
+    } = await supabaseClient.auth.getSession();
+    if (!session) {
+      throw new Error("You are signed out. Please sign in again.");
+    }
+
+    const { data, error } = await supabaseClient
+      .from(TICKER_HISTORY_TABLE)
+      .delete()
+      .eq("id", entryId)
+      .select("id");
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || !data.length) {
+      throw new Error(
+        'Chirp was not deleted. It may already be gone, or the "Authenticated users can delete ticker history" policy is missing (see SUPABASE_SETUP.md, section 4b).'
+      );
+    }
+  };
+
   const deleteArticle = async (articleId) => {
     if (!supabaseClient) {
       throw new Error("Supabase is not configured.");
@@ -636,6 +668,7 @@
     fetchTickerHeadline,
     saveTickerHeadline,
     fetchTickerHistory,
+    deleteTickerHistoryEntry,
     saveArticle,
     deleteArticle,
     signIn,

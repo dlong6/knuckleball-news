@@ -20,6 +20,12 @@
   const headlineTextInput = document.querySelector("#headline-text");
   const headlineStatus = document.querySelector("#headline-status");
   const headlineError = document.querySelector("#headline-error");
+  const articleListPanel = document.querySelector("#article-list-panel");
+  const headlineHistoryPanel = document.querySelector("#headline-history-panel");
+  const headlineHistoryList = document.querySelector("#headline-history-list");
+  const headlineHistorySearch = document.querySelector("#headline-history-search");
+  const headlineHistoryStatus = document.querySelector("#headline-history-status");
+  const headlineHistoryError = document.querySelector("#headline-history-error");
   const generateSlugButton = document.querySelector("#generate-slug-button");
   const saveStatus = document.querySelector("#save-status");
   const saveError = document.querySelector("#save-error");
@@ -99,6 +105,16 @@
 
     if (headlineEditorPanel) {
       headlineEditorPanel.hidden = view !== "headline";
+    }
+
+    // While managing the chirp, "Previous Chirps" takes the place of
+    // the "Existing Articles" list.
+    if (headlineHistoryPanel) {
+      headlineHistoryPanel.hidden = view !== "headline";
+    }
+
+    if (articleListPanel) {
+      articleListPanel.hidden = view === "headline";
     }
   };
 
@@ -1566,6 +1582,101 @@
     });
   };
 
+  let cachedHeadlineHistory = [];
+  let currentTickerHeadline = "";
+
+  const renderHeadlineHistory = () => {
+    if (!headlineHistoryList) {
+      return;
+    }
+
+    headlineHistoryList.innerHTML = "";
+
+    const terms = String(headlineHistorySearch?.value || "")
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+    const visible = cachedHeadlineHistory.filter((entry) => {
+      const source = entry.headline.toLowerCase();
+      return terms.every((term) => source.includes(term));
+    });
+
+    if (!visible.length) {
+      const empty = document.createElement("li");
+      empty.textContent = cachedHeadlineHistory.length ? "No matching chirps." : "No previous chirps yet.";
+      headlineHistoryList.appendChild(empty);
+      return;
+    }
+
+    // The newest archive entry that matches the live ticker is the one
+    // currently running across the site.
+    const liveEntry = cachedHeadlineHistory.find((entry) => entry.headline === currentTickerHeadline);
+
+    visible.forEach((entry) => {
+      const item = document.createElement("li");
+      const isLive = Boolean(liveEntry) && entry.id === liveEntry.id;
+
+      const textWrap = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = entry.headline;
+
+      const meta = document.createElement("p");
+      meta.className = "article-meta";
+      meta.textContent = `${isLive ? "IN TICKER NOW | " : ""}${window.KBData.formatDate(entry.posted_at)}`;
+
+      textWrap.appendChild(title);
+      textWrap.appendChild(meta);
+
+      const actions = document.createElement("div");
+      actions.className = "item-actions";
+
+      const deleteButton = createActionButton("Delete", "secondary-button", async () => {
+        const message = isLive
+          ? `Delete "${entry.headline}" from Chirps? This cannot be undone. It is still in the ticker right now; save a new chirp above to replace it there.`
+          : `Delete "${entry.headline}" from Chirps? This cannot be undone.`;
+        const confirmed = await requestActionConfirm(message, "Delete");
+        if (!confirmed) {
+          return;
+        }
+
+        setText(headlineHistoryError, "", false);
+        setText(headlineHistoryStatus, "Deleting chirp...", true);
+        deleteButton.disabled = true;
+
+        try {
+          await window.KBData.deleteTickerHistoryEntry(entry.id);
+          await refreshHeadlineHistory();
+          setText(headlineHistoryStatus, "Chirp deleted", true);
+        } catch (error) {
+          deleteButton.disabled = false;
+          setText(headlineHistoryStatus, "", false);
+          setText(headlineHistoryError, error.message || "Unable to delete chirp", true);
+        }
+      });
+
+      actions.appendChild(deleteButton);
+      item.appendChild(textWrap);
+      item.appendChild(actions);
+      headlineHistoryList.appendChild(item);
+    });
+  };
+
+  const refreshHeadlineHistory = async () => {
+    if (!headlineHistoryList) {
+      return;
+    }
+
+    try {
+      cachedHeadlineHistory = await window.KBData.fetchTickerHistory();
+      setText(headlineHistoryError, "", false);
+    } catch (error) {
+      cachedHeadlineHistory = [];
+      setText(headlineHistoryError, error.message || "Unable to load previous chirps", true);
+    }
+
+    renderHeadlineHistory();
+  };
+
   const refreshArticles = async () => {
     cachedArticles = await window.KBData.fetchAllArticles();
     renderArticleList();
@@ -1655,22 +1766,25 @@
       return;
     }
 
-    setText(headlineStatus, "Saving headline...", true);
+    setText(headlineStatus, "Saving chirp...", true);
     setText(headlineError, "", false);
 
     try {
       const result = await window.KBData.saveTickerHeadline(headlineTextInput.value);
       const message = result?.scope === "remote"
-        ? "Headline saved"
-        : "Headline saved (local fallback)";
+        ? "Chirp saved"
+        : "Chirp saved (local fallback)";
       setText(headlineStatus, message, true);
       if (result?.historyWarning) {
         setText(headlineError, result.historyWarning, true);
       } else {
         setText(headlineError, "", false);
       }
+      currentTickerHeadline = String(result?.headline || "").trim();
+      setText(headlineHistoryStatus, "", false);
+      await refreshHeadlineHistory();
     } catch (error) {
-      setText(headlineError, error.message || "Unable to save headline", true);
+      setText(headlineError, error.message || "Unable to save chirp", true);
       setText(headlineStatus, "", false);
     }
   };
@@ -1680,16 +1794,19 @@
       return;
     }
 
-    setText(headlineStatus, "Loading headline...", true);
+    setText(headlineStatus, "Loading chirp...", true);
     setText(headlineError, "", false);
 
     try {
       const headline = await window.KBData.fetchTickerHeadline();
       headlineTextInput.value = headline || "";
+      currentTickerHeadline = String(headline || "").trim();
+      setText(headlineHistoryStatus, "", false);
       setAdminView("headline");
       setText(headlineStatus, "", false);
+      await refreshHeadlineHistory();
     } catch (error) {
-      setText(headlineError, error.message || "Unable to load headline", true);
+      setText(headlineError, error.message || "Unable to load chirp", true);
       setText(headlineStatus, "", false);
     }
   };
@@ -1799,6 +1916,8 @@
         renderArticleList();
       });
     }
+
+    headlineHistorySearch?.addEventListener("input", renderHeadlineHistory);
 
     if (editorToolbar) {
       editorToolbar.addEventListener("click", async (event) => {

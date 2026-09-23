@@ -1054,11 +1054,18 @@ a.tag-chip:hover {
   letter-spacing: 0.05em;
 }
 
-/* ---------- Ticker headline archive (headlines.html) ---------- */
+/* ---------- Chirps page (chirps.html) ---------- */
 .headline-archive-page .main-feed {
   grid-column: 1 / -1;
   width: min(820px, 100%);
   justify-self: center;
+}
+
+.post-card.headline-archive-card p.headline-archive-intro {
+  margin: 0 0 1rem;
+  font-style: normal;
+  font-size: 0.94rem;
+  color: #496079;
 }
 
 .headline-archive-search {
