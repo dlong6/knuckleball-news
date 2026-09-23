@@ -1054,6 +1054,100 @@ a.tag-chip:hover {
   letter-spacing: 0.05em;
 }
 
+/* ---------- Ticker headline archive (headlines.html) ---------- */
+.headline-archive-page .main-feed {
+  grid-column: 1 / -1;
+  width: min(820px, 100%);
+  justify-self: center;
+}
+
+.headline-archive-search {
+  display: block;
+  margin: 0.2rem 0 1.1rem;
+}
+
+.headline-archive-search input {
+  width: min(360px, 100%);
+  border: 1px solid #c7d3e2;
+  background: #ffffff;
+  color: #20344e;
+  padding: 0.5rem 0.6rem;
+  font: 500 0.8rem/1.25 "Libre Franklin", "Helvetica Neue", sans-serif;
+}
+
+.post-card.headline-archive-card p.headline-archive-status {
+  margin: 0;
+  color: var(--muted);
+  font: 500 0.82rem/1.45 "Libre Franklin", "Helvetica Neue", sans-serif;
+}
+
+.headline-archive-list,
+.headline-archive-day ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.headline-archive-day + .headline-archive-day {
+  margin-top: 1.2rem;
+}
+
+.headline-archive-day h3 {
+  margin: 0 0 0.35rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--line);
+  color: #31465c;
+  font: 700 0.72rem/1.2 "Libre Franklin", "Helvetica Neue", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.headline-archive-item {
+  display: grid;
+  grid-template-columns: 4.6rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: baseline;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #edf1f6;
+}
+
+.headline-archive-item:last-child {
+  border-bottom: 0;
+}
+
+.headline-archive-time {
+  color: var(--muted);
+  font: 600 0.7rem/1.4 "Libre Franklin", "Helvetica Neue", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.post-card.headline-archive-card p.headline-archive-text {
+  margin: 0;
+  font-family: "Lora", Georgia, serif;
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: #2b3b4b;
+}
+
+@media (max-width: 520px) {
+  .headline-archive-item {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+
+  /* Four nav links plus the mini logo: tighten spacing so they stay on one row. */
+  .primary-nav a {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .nav-inner {
+    gap: 0.1rem;
+  }
+}
+
 @media (max-width: 1000px) {
   .page-content {
     grid-template-columns: 1fr;

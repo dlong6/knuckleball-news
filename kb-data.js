@@ -420,12 +420,81 @@
         if (error) {
           throw formatHeadlineWriteError(error);
         }
-
-        return { headline: normalized, scope: "remote" };
       } catch (error) {
         throw formatHeadlineWriteError(error);
       }
+
+      // The live ticker is saved at this point. Also log it to the headline
+      // archive. A problem here shouldn't block the ticker update, so it's
+      // reported back as a warning instead of thrown.
+      const historyWarning = await recordTickerHistory(normalized);
+      return { headline: normalized, scope: "remote", historyWarning };
     };
+
+  const TICKER_HISTORY_TABLE = "ticker_history";
+
+  // Adds a headline to public.ticker_history, skipping blanks and skipping a
+  // headline identical to the most recent entry (e.g. clicking Save twice).
+  // Returns a warning message on failure, or "" on success.
+  const recordTickerHistory = async (headline) => {
+    if (!supabaseClient || !headline) {
+      return "";
+    }
+
+    try {
+      const { data: latest, error: latestError } = await supabaseClient
+        .from(TICKER_HISTORY_TABLE)
+        .select("headline")
+        .order("posted_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestError) {
+        throw latestError;
+      }
+
+      if (String(latest?.headline || "").trim() === headline) {
+        return "";
+      }
+
+      const { error } = await supabaseClient.from(TICKER_HISTORY_TABLE).insert({ headline });
+      if (error) {
+        throw error;
+      }
+
+      return "";
+    } catch (error) {
+      const message = String(error?.message || "").toLowerCase();
+      if (error?.code === "42P01" || (message.includes(TICKER_HISTORY_TABLE) && message.includes("does not exist"))) {
+        return 'Ticker updated, but it was not added to the headline archive: table public.ticker_history is missing. Run the SQL in SUPABASE_SETUP.md under "Headline archive".';
+      }
+      return `Ticker updated, but it was not added to the headline archive: ${error?.message || "unknown error"}`;
+    }
+  };
+
+  // Every past ticker headline, newest first: [{ id, headline, posted_at }].
+  const fetchTickerHistory = async () => {
+    if (!supabaseClient) {
+      return [];
+    }
+
+    const { data, error } = await supabaseClient
+      .from(TICKER_HISTORY_TABLE)
+      .select("id, headline, posted_at")
+      .order("posted_at", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data || [])
+      .map((row) => ({
+        id: row.id,
+        headline: String(row.headline || "").trim(),
+        posted_at: row.posted_at,
+      }))
+      .filter((row) => row.headline);
+  };
 
   const saveArticle = async (articleInput) => {
     if (!supabaseClient) {
@@ -566,6 +635,7 @@
     fetchAllArticles,
     fetchTickerHeadline,
     saveTickerHeadline,
+    fetchTickerHistory,
     saveArticle,
     deleteArticle,
     signIn,

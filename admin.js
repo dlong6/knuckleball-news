@@ -1664,7 +1664,11 @@
         ? "Headline saved"
         : "Headline saved (local fallback)";
       setText(headlineStatus, message, true);
-      setText(headlineError, "", false);
+      if (result?.historyWarning) {
+        setText(headlineError, result.historyWarning, true);
+      } else {
+        setText(headlineError, "", false);
+      }
     } catch (error) {
       setText(headlineError, error.message || "Unable to save headline", true);
       setText(headlineStatus, "", false);
