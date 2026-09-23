@@ -393,8 +393,11 @@
     }
   };
 
-  const saveTickerHeadline = async (headlineText) => {
+  // mode "new" posts a new chirp (a new archive entry); mode "update" fixes
+  // the chirp that's currently live, replacing its archive entry's text.
+  const saveTickerHeadline = async (headlineText, { mode = "new" } = {}) => {
       const normalized = String(headlineText || "").trim();
+      const replacing = mode === "update" ? await fetchTickerHeadline() : "";
       writeLocalTickerHeadline(normalized);
 
       if (!supabaseClient) {
@@ -427,16 +430,18 @@
       // The live ticker is saved at this point. Also log it to the headline
       // archive. A problem here shouldn't block the ticker update, so it's
       // reported back as a warning instead of thrown.
-      const historyWarning = await recordTickerHistory(normalized);
+      const historyWarning = await recordTickerHistory(normalized, replacing);
       return { headline: normalized, scope: "remote", historyWarning };
     };
 
   const TICKER_HISTORY_TABLE = "ticker_history";
 
-  // Adds a headline to public.ticker_history, skipping blanks and skipping a
+  // When `replacing` is the live chirp and it's the newest archive entry, that
+  // entry's text is corrected in place instead of adding a new one.
+  // Otherwise: adds a headline to public.ticker_history, skipping blanks and skipping a
   // headline identical to the most recent entry (e.g. clicking Save twice).
   // Returns a warning message on failure, or "" on success.
-  const recordTickerHistory = async (headline) => {
+  const recordTickerHistory = async (headline, replacing = "") => {
     if (!supabaseClient || !headline) {
       return "";
     }
@@ -444,13 +449,28 @@
     try {
       const { data: latest, error: latestError } = await supabaseClient
         .from(TICKER_HISTORY_TABLE)
-        .select("headline")
+        .select("id, headline")
         .order("posted_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (latestError) {
         throw latestError;
+      }
+
+      if (replacing && latest && String(latest.headline || "").trim() === replacing) {
+        const { data: updated, error: updateError } = await supabaseClient
+          .from(TICKER_HISTORY_TABLE)
+          .update({ headline })
+          .eq("id", latest.id)
+          .select("id");
+        if (updateError) {
+          throw updateError;
+        }
+        if (!updated || !updated.length) {
+          throw new Error('the archive entry could not be changed (check the "Authenticated users can update ticker history" policy).');
+        }
+        return "";
       }
 
       if (String(latest?.headline || "").trim() === headline) {

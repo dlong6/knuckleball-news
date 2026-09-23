@@ -1798,14 +1798,16 @@
       return;
     }
 
+    // Which button was clicked: "Post New Chirp" or "Update Current Chirp".
+    const mode = event.submitter?.dataset.mode === "update" ? "update" : "new";
+
     setText(headlineStatus, "Saving chirp...", true);
     setText(headlineError, "", false);
 
     try {
-      const result = await window.KBData.saveTickerHeadline(headlineTextInput.value);
-      const message = result?.scope === "remote"
-        ? "Chirp saved"
-        : "Chirp saved (local fallback)";
+      const result = await window.KBData.saveTickerHeadline(headlineTextInput.value, { mode });
+      const saved = mode === "update" ? "Current chirp updated" : "New chirp posted";
+      const message = result?.scope === "remote" ? saved : `${saved} (local fallback)`;
       setText(headlineStatus, message, true);
       if (result?.historyWarning) {
         setText(headlineError, result.historyWarning, true);
