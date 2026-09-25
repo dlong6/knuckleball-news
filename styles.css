@@ -1305,6 +1305,23 @@ a.tag-chip:hover {
     grid-column: 1;
   }
 
+  /* Once the sidebar drops below the feed, keep the column no wider than it
+     is on the full desktop layout (745px) and center it, so article lines
+     don't stretch across the whole window on mid-size screens. Phones are
+     narrower than this, so they're unaffected. */
+  .main-feed,
+  .feed-auto-pager,
+  .sidebar {
+    width: 100%;
+    max-width: 745px;
+    justify-self: center;
+  }
+
+  /* Chirps already has its own centered 820px column; keep it. */
+  .headline-archive-page .main-feed {
+    max-width: 820px;
+  }
+
   .feed-auto-pager {
     grid-row: 2;
   }
