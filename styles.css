@@ -27,11 +27,22 @@
   --text-lead: 0.88rem;  /* ticker, pager titles */
   --text-body-sm: 0.94rem; /* summaries, intros, table paragraphs */
   --text-body: 1rem;     /* general paragraphs */
-  --text-prose: clamp(1.0625rem, 1.02rem + 0.2vw, 1.125rem); /* article text: ~17px phone, 18px desktop */
+  --text-prose: 1.0625rem; /* article + chirps text: 17px on phones (see desktop sizes below) */
   --text-table: clamp(0.72rem, 0.68rem + 0.2vw, 0.78rem);
   --text-title-sm: 1rem; /* latest-list headlines */
   --text-title-md: clamp(1.15rem, 2vw, 1.45rem);
   --text-title-lg: clamp(1.23rem, 2.2vw, 1.72rem); /* article card headlines */
+}
+
+/* ---------- Desktop text sizes ----------
+   Phones (760px and narrower, the same breakpoint the phone layout uses)
+   get the larger reading sizes above; wider screens use these smaller
+   ones. Adjust these two to tune desktop without touching mobile. */
+@media (min-width: 761px) {
+  :root {
+    --text-prose: 1rem;       /* article + chirps text: 16px */
+    --text-body: 0.94rem;     /* page subtitles, 404 text: 15px */
+  }
 }
 
 * {
