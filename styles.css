@@ -9,6 +9,29 @@
   --link: #3465A4;
   --link-hover: #3465A4;
   --accent: #f3c451;
+
+  /* ---------- Type scale ----------
+     Every text size on the site points at one of these. To make all body
+     text bigger or smaller, change it here instead of hunting through rules.
+     Small sizes are for labels, bylines, nav and tables; --text-prose is the
+     article reading size. */
+  --font-ui: "Libre Franklin", "Helvetica Neue", sans-serif;
+  --font-prose: "Lora", Georgia, serif;
+  --font-display: "Merriweather", Georgia, serif;
+
+  --text-2xs: 0.64rem;   /* tag chips, tiny meta */
+  --text-xs: 0.67rem;    /* captions, share/action labels */
+  --text-sm: 0.71rem;    /* kickers, bylines, section labels */
+  --text-md: 0.76rem;    /* nav, sidebar links, buttons */
+  --text-ui: 0.82rem;    /* form inputs, modal copy, module headings */
+  --text-lead: 0.88rem;  /* ticker, pager titles */
+  --text-body-sm: 0.94rem; /* summaries, intros, table paragraphs */
+  --text-body: 1rem;     /* general paragraphs */
+  --text-prose: clamp(1.0625rem, 1.02rem + 0.2vw, 1.125rem); /* article text: ~17px phone, 18px desktop */
+  --text-table: clamp(0.72rem, 0.68rem + 0.2vw, 0.78rem);
+  --text-title-sm: 1rem; /* latest-list headlines */
+  --text-title-md: clamp(1.15rem, 2vw, 1.45rem);
+  --text-title-lg: clamp(1.23rem, 2.2vw, 1.72rem); /* article card headlines */
 }
 
 * {
@@ -17,7 +40,7 @@
 
 body {
   margin: 0;
-  font-family: "Merriweather", Georgia, serif;
+  font-family: var(--font-display);
   background: linear-gradient(180deg, #f5f7f9 0%, #e7ecf2 220px, #eef1f4 100%);
   color: var(--ink);
 }
@@ -52,8 +75,8 @@ a:hover {
 .utility-bar {
   background: var(--navy-darker);
   border-bottom: 1px solid #091729;
-  font-family: "Libre Franklin", "Helvetica Neue", sans-serif;
-  font-size: 0.72rem;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
   text-transform: none;
   letter-spacing: normal;
 }
@@ -88,11 +111,11 @@ a:hover {
 }
 
 .headline-label {
-  font-family: "Libre Franklin", "Helvetica Neue", sans-serif;
+  font-family: var(--font-ui);
   color: #000000;
   text-transform: none;
   letter-spacing: normal;
-  font-size: 0.88rem;
+  font-size: var(--text-lead);
   font-weight: 700;
 }
 
@@ -107,7 +130,7 @@ a:hover {
   /* Reserve one line of ticker text before it loads, so the header doesn't
      grow (and push the page down) when the text arrives. Matches the
      .headline-copy font size and line height below. */
-  min-height: calc(0.88rem * 1.2);
+  min-height: calc(var(--text-lead) * 1.2);
 }
 
 .headline-track {
@@ -124,7 +147,7 @@ a:hover {
   color: #ffffff;
   white-space: nowrap;
   display: block;
-  font-size: 0.88rem;
+  font-size: var(--text-lead);
   line-height: 1.2;
   font-weight: 500;
   -webkit-font-smoothing: antialiased;
@@ -189,7 +212,7 @@ a:hover {
   border: 1px solid #233e62;
   background: #eef3f8;
   color: #17283d;
-  font: 500 0.76rem/1 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 500 var(--text-md)/1 var(--font-ui);
   padding: 0 0.6rem;
 }
 
@@ -201,10 +224,10 @@ a:hover {
 
 .primary-nav a {
   color: #eff4fa;
-  font-family: "Libre Franklin", "Helvetica Neue", sans-serif;
+  font-family: var(--font-ui);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  font-size: 0.74rem;
+  font-size: var(--text-md);
   font-weight: 600;
   padding: 0.56rem 0.72rem;
   border-radius: 2px;
@@ -260,20 +283,20 @@ a:hover {
 .teams-modal-form h2 {
   margin: 0;
   color: #1e344f;
-  font-size: clamp(1.15rem, 2vw, 1.45rem);
+  font-size: var(--text-title-md);
 }
 
 .teams-modal-form p {
   margin: 0;
   color: #4f6176;
-  font: 500 0.82rem/1.45 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 500 var(--text-ui)/1.45 var(--font-ui);
 }
 
 .team-modal-search-wrap {
   display: grid;
   gap: 0.35rem;
   color: #2c4260;
-  font: 700 0.67rem/1.2 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 700 var(--text-xs)/1.2 var(--font-ui);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -284,7 +307,7 @@ a:hover {
   background: #ffffff;
   color: #20344e;
   padding: 0.5rem 0.6rem;
-  font: 500 0.8rem/1.25 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 500 var(--text-ui)/1.25 var(--font-ui);
   text-transform: none;
   letter-spacing: normal;
 }
@@ -292,7 +315,7 @@ a:hover {
 .team-modal-section {
   margin: 0.35rem 0 -0.25rem;
   color: #2e4662;
-  font: 700 0.72rem/1.2 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 700 var(--text-sm)/1.2 var(--font-ui);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -316,7 +339,7 @@ a:hover {
   color: #20344e;
   text-align: left;
   padding: 0.55rem 0.65rem;
-  font: 600 0.76rem/1.3 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 600 var(--text-md)/1.3 var(--font-ui);
   cursor: pointer;
 }
 
@@ -393,7 +416,7 @@ a:hover {
 .mobile-latest-link {
   display: block;
   color: #1c3553;
-  font-size: 1.02rem;
+  font-size: var(--text-title-sm);
   line-height: 1.35;
   font-weight: 700;
   text-decoration: none;
@@ -408,7 +431,7 @@ a:hover {
   color: #64758a;
   text-transform: uppercase;
   letter-spacing: 0.045em;
-  font: 600 0.64rem/1.4 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 600 var(--text-2xs)/1.4 var(--font-ui);
 }
 
 .post-card {
@@ -423,12 +446,12 @@ a:hover {
   color: #5b6f84;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  font: 700 0.7rem/1 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 700 var(--text-sm)/1 var(--font-ui);
 }
 
 .post-card h2 {
   margin: 0 0 0.65rem;
-  font-size: clamp(1.23rem, 2.2vw, 1.72rem);
+  font-size: var(--text-title-lg);
   line-height: 1.18;
   font-weight: 900;
 }
@@ -438,7 +461,7 @@ a:hover {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.045em;
-  font: 500 0.7rem/1.4 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 500 var(--text-sm)/1.4 var(--font-ui);
 }
 
 .post-meta-row {
@@ -458,10 +481,10 @@ a:hover {
 }
 
 .tag-chip {
-  font-family: "Libre Franklin", "Helvetica Neue", sans-serif;
+  font-family: var(--font-ui);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-size: 0.63rem;
+  font-size: var(--text-2xs);
   font-weight: 700;
   border-radius: 3px;
   padding: 0.35rem 0.62rem;
@@ -580,7 +603,7 @@ a.tag-chip:hover {
   background: transparent;
   color: #4f647f;
   padding: 0;
-  font: 700 0.68rem/1 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 700 var(--text-xs)/1 var(--font-ui);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   cursor: pointer;
@@ -593,10 +616,14 @@ a.tag-chip:hover {
   text-decoration: underline;
 }
 
-.post-card p:not(.post-kicker):not(.post-meta) {
+/* Plain paragraphs in cards: page subtitles, intros, 404 text.
+   Article text inside .post-body is left out on purpose; it has its own
+   rules below. (:where() adds no specificity, so more specific rules such as
+   the chirps-page ones still win over this one.) */
+.post-card p:not(.post-kicker):not(.post-meta):not(:where(.post-body p)) {
   margin: 0 0 0.95rem;
   line-height: 1.58;
-  font-size: 0.92rem;
+  font-size: var(--text-body);
   color: #3b5066;
   font-weight: 400;
 }
@@ -606,7 +633,7 @@ a.tag-chip:hover {
 }
 
 .post-summary {
-  font-size: 0.94rem;
+  font-size: var(--text-body-sm);
   color: #496079;
   font-style: italic;
 }
@@ -617,7 +644,9 @@ a.tag-chip:hover {
    different values, which is how this drifted out of sync before. */
 .post-body {
   color: #3b5066;
-  font-weight: 400;
+  /* Medium (500) instead of regular: a touch heavier for easier reading on
+     phones without looking bold. Lora 500 is already loaded in the page head. */
+  font-weight: 500;
 }
 
 .post-body a {
@@ -629,17 +658,19 @@ a.tag-chip:hover {
 }
 
 .post-body :is(strong, b) {
-  font-weight: 600;
+  /* One step above the 500 body text so bold still stands out. */
+  font-weight: 700;
 }
 
 /* Article copy everywhere it's rendered (home feed, category feed, article page): softer, more readable long-form text. */
 #article-view .post-summary,
 .post-body,
 .post-body :is(p, li) {
-  font-family: "Lora", Georgia, serif;
-  font-size: clamp(0.98rem, 0.95rem + 0.18vw, 1.06rem);
-  line-height: 1.7;
-  color: #455d76;
+  font-family: var(--font-prose);
+  /* ~17px on phones, up to 18px on wide screens. */
+  font-size: var(--text-prose);
+  line-height: 1.65;
+  color: #3b5066;
 }
 
 .post-body p {
@@ -656,7 +687,7 @@ a.tag-chip:hover {
 }
 
 .post-body :is(h1, h2, h3, h4, h5, h6) {
-  font-family: "Lora", Georgia, serif;
+  font-family: var(--font-prose);
   color: #3c5570;
   font-weight: 600;
   line-height: 1.3;
@@ -667,7 +698,7 @@ a.tag-chip:hover {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
-  font: 600 0.68rem/1 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 600 var(--text-xs)/1 var(--font-ui);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -684,7 +715,7 @@ a.tag-chip:hover {
 
 .post-share-label {
   color: #54677e;
-  font: 700 0.68rem/1 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 700 var(--text-xs)/1 var(--font-ui);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -698,7 +729,7 @@ a.tag-chip:hover {
   color: #1d3857;
   padding: 0.34rem 0.55rem;
   border-radius: 3px;
-  font: 700 0.66rem/1 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 700 var(--text-xs)/1 var(--font-ui);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   text-decoration: none;
@@ -724,7 +755,7 @@ a.tag-chip:hover {
   color: #eff4fa;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  font: 700 0.72rem/1 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 700 var(--text-sm)/1 var(--font-ui);
   padding: 0.72rem 0.9rem;
   text-decoration: none;
 }
@@ -768,14 +799,14 @@ a.tag-chip:hover {
 }
 
 .article-pager-label {
-  font: 700 0.7rem/1 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 700 var(--text-sm)/1 var(--font-ui);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #3465a4;
 }
 
 .article-pager-title {
-  font: 600 0.86rem/1.35 "Lora", Georgia, serif;
+  font: 600 var(--text-lead)/1.35 var(--font-prose);
   overflow-wrap: anywhere;
 }
 
@@ -794,8 +825,8 @@ a.tag-chip:hover {
   max-width: 100%;
   table-layout: auto;
   border-collapse: collapse;
-  font-family: "Libre Franklin", "Helvetica Neue", sans-serif;
-  font-size: clamp(0.72rem, 0.68rem + 0.2vw, 0.78rem);
+  font-family: var(--font-ui);
+  font-size: var(--text-table);
   line-height: 1.35;
   background: #ffffff;
 }
@@ -833,7 +864,19 @@ a.tag-chip:hover {
 /* Keep table internals using table typography, not article-body overrides. */
 .post-body .stats-table,
 .post-body .stats-table :is(th, td, p, div, span, a) {
-  font-family: "Libre Franklin", "Helvetica Neue", sans-serif !important;
+  font-family: var(--font-ui) !important;
+}
+
+/* Tables use their own compact typography, not the larger article text. */
+.post-body .stats-table {
+  font-weight: 400;
+}
+
+.post-body .stats-table p {
+  margin: 0 0 0.95rem;
+  font-size: var(--text-body-sm);
+  font-weight: 400;
+  line-height: 1.58;
 }
 
 .stats-table thead th {
@@ -923,8 +966,8 @@ a.tag-chip:hover {
 .table-caption {
   margin: -0.35rem 0 1rem;
   color: #627184;
-  font-family: "Libre Franklin", "Helvetica Neue", sans-serif;
-  font-size: 0.66rem;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
   line-height: 1.3;
   text-align: center;
   font-style: italic;
@@ -937,10 +980,10 @@ a.tag-chip:hover {
 .post-body .stats-table-wrap + .table-caption,
 .post-body p.table-caption,
 .post-body .table-caption {
-  margin: -0.35rem 0 1rem;
+  margin: 0 0 0.95rem;
   color: #627184 !important;
-  font-family: "Libre Franklin", "Helvetica Neue", sans-serif !important;
-  font-size: 0.66rem !important;
+  font-family: var(--font-ui) !important;
+  font-size: var(--text-xs) !important;
   line-height: 1.3 !important;
   text-align: center;
   font-style: italic;
@@ -969,7 +1012,7 @@ a.tag-chip:hover {
 
 .module h3 {
   margin: 0;
-  font: 700 0.84rem/1 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 700 var(--text-ui)/1 var(--font-ui);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #31465c;
@@ -992,7 +1035,7 @@ a.tag-chip:hover {
 .module li a {
   display: block;
   padding: 0.45rem 0;
-  font-size: 0.78rem;
+  font-size: var(--text-md);
   line-height: 1.34;
   color: #4a6480;
 }
@@ -1043,7 +1086,7 @@ a.tag-chip:hover {
 .partner-ad-line {
   margin: 0;
   color: #2b435d;
-  font: 600 0.78rem/1.25 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 600 var(--text-md)/1.25 var(--font-ui);
   letter-spacing: 0.01em;
   text-transform: none;
 }
@@ -1072,7 +1115,7 @@ a.tag-chip:hover {
 .site-footer h4 {
   margin: 0 0 0.6rem;
   color: #2c3f56;
-  font: 700 0.74rem/1 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 700 var(--text-md)/1 var(--font-ui);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -1080,7 +1123,7 @@ a.tag-chip:hover {
 .site-footer a {
   display: block;
   margin-bottom: 0.45rem;
-  font-size: 0.8rem;
+  font-size: var(--text-ui);
 }
 
 .footer-brand-wrap {
@@ -1103,7 +1146,7 @@ a.tag-chip:hover {
   padding: 0.3rem 0 1.2rem;
   text-align: center;
   color: #5f6d7d;
-  font: 500 0.71rem/1.5 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 500 var(--text-sm)/1.5 var(--font-ui);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -1118,7 +1161,7 @@ a.tag-chip:hover {
 .post-card.headline-archive-card p.headline-archive-intro {
   margin: 0 0 1rem;
   font-style: normal;
-  font-size: 0.94rem;
+  font-size: var(--text-body-sm);
   color: #496079;
 }
 
@@ -1133,13 +1176,13 @@ a.tag-chip:hover {
   background: #ffffff;
   color: #20344e;
   padding: 0.5rem 0.6rem;
-  font: 500 0.8rem/1.25 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 500 var(--text-ui)/1.25 var(--font-ui);
 }
 
 .post-card.headline-archive-card p.headline-archive-status {
   margin: 0;
   color: var(--muted);
-  font: 500 0.82rem/1.45 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 500 var(--text-ui)/1.45 var(--font-ui);
 }
 
 .headline-archive-list,
@@ -1158,7 +1201,7 @@ a.tag-chip:hover {
   padding-bottom: 0.4rem;
   border-bottom: 1px solid var(--line);
   color: #31465c;
-  font: 700 0.72rem/1.2 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 700 var(--text-sm)/1.2 var(--font-ui);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -1178,7 +1221,7 @@ a.tag-chip:hover {
 
 .headline-archive-time {
   color: var(--muted);
-  font: 600 0.7rem/1.4 "Libre Franklin", "Helvetica Neue", sans-serif;
+  font: 600 var(--text-sm)/1.4 var(--font-ui);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   white-space: nowrap;
@@ -1186,8 +1229,9 @@ a.tag-chip:hover {
 
 .post-card.headline-archive-card p.headline-archive-text {
   margin: 0;
-  font-family: "Lora", Georgia, serif;
-  font-size: 0.98rem;
+  font-family: var(--font-prose);
+  font-size: var(--text-prose);
+  font-weight: 500;
   line-height: 1.55;
   color: #2b3b4b;
 }
@@ -1228,7 +1272,7 @@ a.tag-chip:hover {
 @media (max-width: 360px) {
   /* The narrowest phones: slightly smaller nav text so the logo still fits. */
   .primary-nav a {
-    font-size: 0.7rem;
+    font-size: var(--text-sm);
     letter-spacing: 0.02em;
     padding-left: 0.4rem;
     padding-right: 0.4rem;
@@ -1299,10 +1343,6 @@ a.tag-chip:hover {
     padding: 0.9rem 0.85rem;
   }
 
-  .mobile-latest-link {
-    font-size: 0.98rem;
-  }
-
   .load-next-article-wrap {
     display: block;
     margin-top: 1rem;
@@ -1361,7 +1401,7 @@ a.tag-chip:hover {
   }
 
   .stats-table {
-    font-size: 0.68rem;
+    font-size: var(--text-xs);
     line-height: 1.26;
   }
 
