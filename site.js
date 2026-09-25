@@ -25,9 +25,8 @@
 
   // Which home-feed layout is on screen: "cards" (full articles) or "list"
   // (the phone headline list). It's chosen from the screen width when the
-  // feed is first built, and only switched on resize/rotate if the reader
-  // hasn't started reading yet (see handleViewportChange), so someone who
-  // is mid-article never has the article swapped out from under them.
+  // feed is built (page load or a new search) and is never swapped on
+  // resize/rotate, so a reader never has the article taken away mid-read.
   let feedLayout = null;
 
   const isMobileViewport = () => window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
@@ -1085,29 +1084,6 @@
   };
 
   // ---------- Keeping the reader's place ----------
-  // "Started reading" means the top of the article feed has scrolled up
-  // past the top of the window. Before that, the reader is still at the
-  // top of the page, so swapping layouts costs them nothing.
-  const hasStartedReading = () => {
-    if (!mainFeed) {
-      return false;
-    }
-    return mainFeed.getBoundingClientRect().top < 0;
-  };
-
-  // Called when the window crosses the phone/desktop width (resize or
-  // rotate). Swap layouts only if the reader is still at the top; otherwise
-  // keep the current layout and let the page restyle around it.
-  const handleViewportChange = () => {
-    const wanted = getViewportLayout();
-    if (wanted === feedLayout || hasStartedReading()) {
-      return;
-    }
-    feedLayout = wanted;
-    visibleCount = Math.max(visibleCount, getInitialVisibleCount());
-    renderCurrentPage();
-  };
-
   // When the window is resized or a phone is rotated, text reflows and the
   // paragraph being read can jump up or down the page. This remembers which
   // block of the feed is at the top of the window (and how far into it the
@@ -1136,9 +1112,6 @@
       anchor = null;
       widthAtAnchor = window.innerWidth;
       heightAtAnchor = window.innerHeight;
-      if (!hasStartedReading()) {
-        return;
-      }
       const blocks = getBlocks();
       for (let index = 0; index < blocks.length; index += 1) {
         const rect = blocks[index].getBoundingClientRect();
@@ -1193,8 +1166,6 @@
     );
 
     window.addEventListener("resize", () => {
-      // Runs after the layout-swap check (the width listener fires first),
-      // so a swap at the top of the page is never fought over.
       window.requestAnimationFrame(() => {
         restoreAnchor();
         recordAnchor();
@@ -1208,17 +1179,11 @@
     bindSearch();
     bindInstagramShare();
 
-    const mobileQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
-    const rerenderForViewport = () => {
-      handleViewportChange();
-    };
+    // The feed layout (full articles or phone headline list) is picked when
+    // the page loads and is not swapped on resize or rotate, so a reader
+    // never loses the article they're in. keepReadingPlace holds their spot
+    // while the text reflows.
     keepReadingPlace();
-
-    if (typeof mobileQuery.addEventListener === "function") {
-      mobileQuery.addEventListener("change", rerenderForViewport);
-    } else if (typeof mobileQuery.addListener === "function") {
-      mobileQuery.addListener(rerenderForViewport);
-    }
 
     if (!window.KBData.hasSupabaseConfig) {
       setupFallbackHomepage();
