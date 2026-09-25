@@ -27,7 +27,8 @@
   --text-lead: 0.88rem;  /* ticker, pager titles */
   --text-body-sm: 0.94rem; /* summaries, intros, table paragraphs */
   --text-body: 1rem;     /* general paragraphs */
-  --text-prose: 1.0625rem; /* article + chirps text: 17px on phones (see desktop sizes below) */
+  --text-prose: 1.0625rem; /* article text: 17px on phones (see desktop sizes below) */
+  --text-chirp: 1rem;      /* chirps library text: 16px on phones */
   --text-table: clamp(0.72rem, 0.68rem + 0.2vw, 0.78rem);
   --text-title-sm: 1rem; /* latest-list headlines */
   --text-title-md: clamp(1.15rem, 2vw, 1.45rem);
@@ -37,10 +38,11 @@
 /* ---------- Desktop text sizes ----------
    Phones (760px and narrower, the same breakpoint the phone layout uses)
    get the larger reading sizes above; wider screens use these smaller
-   ones. Adjust these two to tune desktop without touching mobile. */
+   ones. Adjust these to tune desktop without touching mobile. */
 @media (min-width: 761px) {
   :root {
-    --text-prose: 1rem;       /* article + chirps text: 16px */
+    --text-prose: 1rem;       /* article text: 16px */
+    --text-chirp: 0.98rem;    /* chirps library text: 15.7px */
     --text-body: 0.94rem;     /* page subtitles, 404 text: 15px */
   }
 }
@@ -1241,7 +1243,7 @@ a.tag-chip:hover {
 .post-card.headline-archive-card p.headline-archive-text {
   margin: 0;
   font-family: var(--font-prose);
-  font-size: var(--text-prose);
+  font-size: var(--text-chirp);
   font-weight: 500;
   line-height: 1.55;
   color: #2b3b4b;
