@@ -23,6 +23,13 @@
   let autoPagerObserver = null;
   let isAutoPaging = false;
 
+  // Which home-feed layout is on screen: "cards" (full articles) or "list"
+  // (the phone headline list). It's chosen from the screen width when the
+  // feed is first built, and only switched on resize/rotate if the reader
+  // hasn't started reading yet (see handleViewportChange), so someone who
+  // is mid-article never has the article swapped out from under them.
+  let feedLayout = null;
+
   const isMobileViewport = () => window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
   const getInitialVisibleCount = () =>
     isMobileViewport() ? MOBILE_INITIAL_VISIBLE_COUNT : DESKTOP_INITIAL_VISIBLE_COUNT;
@@ -563,10 +570,15 @@
     autoPagerSentinel.hidden = !activeArticles.length || visibleCount >= total;
   };
 
+  const getViewportLayout = () => (isMobileViewport() ? "list" : "cards");
+
   const renderCurrentPage = () => {
     const total = activeArticles.length;
     const pageItems = activeArticles.slice(0, Math.min(visibleCount, total));
-    if (isMobileViewport()) {
+    if (!feedLayout) {
+      feedLayout = getViewportLayout();
+    }
+    if (feedLayout === "list") {
       renderMobileArticleCollection(pageItems);
     } else {
       renderArticleCollection(pageItems);
@@ -577,6 +589,9 @@
   const setActiveArticles = (articles, resetVisible = true) => {
     activeArticles = articles;
     if (resetVisible) {
+      // A fresh list (first load or a new search) starts at the top, so it
+      // uses whichever layout fits the screen right now.
+      feedLayout = getViewportLayout();
       visibleCount = getInitialVisibleCount();
     }
     renderCurrentPage();
@@ -1069,14 +1084,135 @@
     enableAllTableTools(document);
   };
 
+  // ---------- Keeping the reader's place ----------
+  // "Started reading" means the top of the article feed has scrolled up
+  // past the top of the window. Before that, the reader is still at the
+  // top of the page, so swapping layouts costs them nothing.
+  const hasStartedReading = () => {
+    if (!mainFeed) {
+      return false;
+    }
+    return mainFeed.getBoundingClientRect().top < 0;
+  };
+
+  // Called when the window crosses the phone/desktop width (resize or
+  // rotate). Swap layouts only if the reader is still at the top; otherwise
+  // keep the current layout and let the page restyle around it.
+  const handleViewportChange = () => {
+    const wanted = getViewportLayout();
+    if (wanted === feedLayout || hasStartedReading()) {
+      return;
+    }
+    feedLayout = wanted;
+    visibleCount = Math.max(visibleCount, getInitialVisibleCount());
+    renderCurrentPage();
+  };
+
+  // When the window is resized or a phone is rotated, text reflows and the
+  // paragraph being read can jump up or down the page. This remembers which
+  // block of the feed is at the top of the window (and how far into it the
+  // reader is), then scrolls it back to the same spot after the reflow.
+  const keepReadingPlace = () => {
+    if (!mainFeed) {
+      return;
+    }
+
+    const ANCHOR_SELECTOR = [
+      ".post-card > .post-kicker",
+      ".post-card > h2",
+      ".post-card > .post-meta-row",
+      ".post-body > *",
+      ".mobile-latest-item",
+    ].join(", ");
+
+    let anchor = null;
+    let widthAtAnchor = window.innerWidth;
+    let heightAtAnchor = window.innerHeight;
+    let pending = false;
+
+    const getBlocks = () => Array.from(mainFeed.querySelectorAll(ANCHOR_SELECTOR));
+
+    const recordAnchor = () => {
+      anchor = null;
+      widthAtAnchor = window.innerWidth;
+      heightAtAnchor = window.innerHeight;
+      if (!hasStartedReading()) {
+        return;
+      }
+      const blocks = getBlocks();
+      for (let index = 0; index < blocks.length; index += 1) {
+        const rect = blocks[index].getBoundingClientRect();
+        if (rect.bottom > 0 && rect.height > 0) {
+          anchor = {
+            index,
+            tag: blocks[index].tagName,
+            top: rect.top,
+            // How far into this block the top of the window is (0 to 1).
+            progress: rect.top < 0 ? -rect.top / rect.height : 0,
+          };
+          return;
+        }
+      }
+    };
+
+    const restoreAnchor = () => {
+      if (!anchor) {
+        return;
+      }
+      const block = getBlocks()[anchor.index];
+      if (!block || block.tagName !== anchor.tag) {
+        return;
+      }
+      const rect = block.getBoundingClientRect();
+      const shift = anchor.top < 0 ? rect.top + anchor.progress * rect.height : rect.top - anchor.top;
+      if (Math.abs(shift) >= 1) {
+        window.scrollBy(0, shift);
+      }
+    };
+
+    // Scroll events fired while the window is mid-resize come from the
+    // reflow itself, not the reader, so they must not overwrite the anchor.
+    const isResizing = () =>
+      window.innerWidth !== widthAtAnchor || window.innerHeight !== heightAtAnchor;
+
+    window.addEventListener(
+      "scroll",
+      () => {
+        if (pending || isResizing()) {
+          return;
+        }
+        pending = true;
+        window.requestAnimationFrame(() => {
+          pending = false;
+          if (!isResizing()) {
+            recordAnchor();
+          }
+        });
+      },
+      { passive: true }
+    );
+
+    window.addEventListener("resize", () => {
+      // Runs after the layout-swap check (the width listener fires first),
+      // so a swap at the top of the page is never fought over.
+      window.requestAnimationFrame(() => {
+        restoreAnchor();
+        recordAnchor();
+      });
+    });
+
+    recordAnchor();
+  };
+
   const setupPage = async () => {
     bindSearch();
     bindInstagramShare();
 
     const mobileQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
     const rerenderForViewport = () => {
-      renderCurrentPage();
+      handleViewportChange();
     };
+    keepReadingPlace();
 
     if (typeof mobileQuery.addEventListener === "function") {
       mobileQuery.addEventListener("change", rerenderForViewport);
