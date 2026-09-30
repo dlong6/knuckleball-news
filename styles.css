@@ -1445,3 +1445,12 @@ a.tag-chip:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* Article photos inserted from the admin editor. */
+.post-body img,
+.post-body .editor-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1rem auto;
+}

@@ -700,7 +700,7 @@
       .forEach((li) => {
         const cleanLi = document.createElement("li");
         sanitizeWalkInlineChildrenInto(li, cleanLi);
-        if (cleanLi.textContent.trim()) {
+        if (cleanLi.textContent.trim() || cleanLi.querySelector("img")) {
           clean.appendChild(cleanLi);
         }
       });
@@ -720,7 +720,10 @@
         return currentParagraph;
       },
       flush() {
-        if (currentParagraph && currentParagraph.textContent.replace(/ /g, " ").trim() !== "") {
+        // Keep a paragraph if it has visible text OR an image. The photo
+        // toolbar button inserts <p><img></p>, which has no text, so
+        // checking text alone silently dropped standalone images on save.
+        if (currentParagraph && (currentParagraph.textContent.replace(/\u00a0/g, " ").trim() !== "" || currentParagraph.querySelector("img"))) {
           output.appendChild(currentParagraph);
         }
         currentParagraph = null;
