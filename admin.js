@@ -436,6 +436,11 @@
       return;
     }
 
+    if (getSelectedEditorImage()) {
+      editorHelp.textContent = "Photo selected: pick a size above the editor, or remove it. Click elsewhere to deselect.";
+      return;
+    }
+
     if (getTableContext()) {
       editorHelp.textContent = "Table selected: use row/column tools or add/delete header rows.";
       return;
@@ -555,6 +560,27 @@
   // <span> or <font> or a deeply nested <div>) unwrapped so its CONTENTS
   // still get processed. Nothing is ever skipped wholesale, so content
   // can't silently disappear the way it could with the old approach.
+  // Photo size presets chosen in the admin editor. Stored as a class on the
+  // <img> (not an inline style) because the article page strips style
+  // attributes. Any class not in this list is dropped by the sanitizer.
+  const IMAGE_SIZE_CLASSES = ["img-size-small", "img-size-medium", "img-size-large", "img-size-full"];
+
+  const sanitizeBuildCleanImage = (source) => {
+    const src = source.getAttribute("src") || "";
+    if (!src) {
+      return null;
+    }
+    const clean = document.createElement("img");
+    clean.setAttribute("src", src);
+    clean.setAttribute("alt", source.getAttribute("alt") || "");
+    clean.className = "editor-image";
+    const size = IMAGE_SIZE_CLASSES.find((name) => source.classList.contains(name));
+    if (size) {
+      clean.classList.add(size);
+    }
+    return clean;
+  };
+
   const SANITIZE_INLINE_MARKS = { strong: "strong", b: "strong", em: "em", i: "em", u: "u", s: "s", strike: "s", del: "s" };
   const SANITIZE_BLOCK_BOUNDARY_TAGS = new Set(["p", "div", "section", "article", "blockquote", "header", "footer", "figure"]);
 
@@ -605,12 +631,8 @@
       }
 
       if (tag === "img") {
-        const src = child.getAttribute("src") || "";
-        if (src) {
-          const clean = document.createElement("img");
-          clean.setAttribute("src", src);
-          clean.setAttribute("alt", child.getAttribute("alt") || "");
-          clean.className = "editor-image";
+        const clean = sanitizeBuildCleanImage(child);
+        if (clean) {
           container.appendChild(clean);
         }
         return;
@@ -775,12 +797,8 @@
     }
 
     if (tag === "img") {
-      const src = node.getAttribute("src") || "";
-      if (src) {
-        const clean = document.createElement("img");
-        clean.setAttribute("src", src);
-        clean.setAttribute("alt", node.getAttribute("alt") || "");
-        clean.className = "editor-image";
+      const clean = sanitizeBuildCleanImage(node);
+      if (clean) {
         state.getParagraph().appendChild(clean);
       }
       return;
@@ -880,7 +898,97 @@
 
     const cleaned = sanitizeArticleHtml(root.innerHTML);
     root.innerHTML = cleaned;
+    clearEditorImageSelection();
     return cleaned;
+  };
+
+  // ---------------------------------------------------------------------
+  // Photo selection and sizing. Clicking a photo in the editor selects it
+  // and shows the "Photo size" bar. The chosen size is stored as one of
+  // IMAGE_SIZE_CLASSES on the <img>; "is-selected" is editor-only and is
+  // dropped by the sanitizer on save.
+  const imageSizeBar = document.querySelector("#image-size-bar");
+  let selectedEditorImage = null;
+
+  const getSelectedEditorImage = () => (
+    selectedEditorImage && field.bodyEditor && field.bodyEditor.contains(selectedEditorImage)
+      ? selectedEditorImage
+      : null
+  );
+
+  const syncImageSizeBar = () => {
+    const image = getSelectedEditorImage();
+    if (!imageSizeBar) {
+      return;
+    }
+
+    imageSizeBar.hidden = !image;
+    if (!image) {
+      return;
+    }
+
+    const current = IMAGE_SIZE_CLASSES.find((name) => image.classList.contains(name)) || "";
+    imageSizeBar.querySelectorAll("button[data-image-size]").forEach((button) => {
+      button.setAttribute("aria-pressed", String(button.dataset.imageSize === current));
+    });
+  };
+
+  const clearEditorImageSelection = () => {
+    if (selectedEditorImage) {
+      selectedEditorImage.classList.remove("is-selected");
+      if (!selectedEditorImage.classList.length) {
+        selectedEditorImage.removeAttribute("class");
+      }
+    }
+    selectedEditorImage = null;
+    syncImageSizeBar();
+    updateEditorHelp();
+  };
+
+  const selectEditorImage = (image) => {
+    if (selectedEditorImage && selectedEditorImage !== image) {
+      selectedEditorImage.classList.remove("is-selected");
+    }
+    selectedEditorImage = image;
+    image.classList.add("is-selected");
+    syncImageSizeBar();
+    updateEditorHelp();
+  };
+
+  const syncBodyFieldFromEditor = () => {
+    field.body.value = stripLegacyTickerParagraphFromBody(field.bodyEditor.innerHTML || "");
+    writeDraftToStorage();
+  };
+
+  const setSelectedImageSize = (sizeClass) => {
+    const image = getSelectedEditorImage();
+    if (!image) {
+      return;
+    }
+
+    IMAGE_SIZE_CLASSES.forEach((name) => image.classList.remove(name));
+    if (IMAGE_SIZE_CLASSES.includes(sizeClass)) {
+      image.classList.add(sizeClass);
+    }
+    syncImageSizeBar();
+    syncBodyFieldFromEditor();
+  };
+
+  const removeSelectedImage = () => {
+    const image = getSelectedEditorImage();
+    if (!image) {
+      return;
+    }
+
+    const parent = image.parentElement;
+    image.remove();
+    if (parent && parent !== field.bodyEditor && !parent.textContent.trim() && !parent.querySelector("img, table")) {
+      parent.remove();
+    }
+    selectedEditorImage = null;
+    syncImageSizeBar();
+    updateEditorHelp();
+    syncBodyFieldFromEditor();
   };
 
   // Moves the caret to the end of the editor's content. Used after a paste
@@ -1318,7 +1426,13 @@
 
       const defaultAlt = file.name ? file.name.replace(/\.[a-z0-9]+$/i, "") : "Article image";
       const alt = window.prompt("Enter image alt text", defaultAlt) || defaultAlt;
-      insertHtmlAtCursor(`<p><img src=\"${src}\" alt=\"${alt.replace(/\"/g, "&quot;")}\" class=\"editor-image\" /></p>`);
+      insertHtmlAtCursor(`<p><img src=\"${src}\" alt=\"${alt.replace(/\"/g, "&quot;")}\" class=\"editor-image\" data-new-image=\"true\" /></p>`);
+      const inserted = field.bodyEditor.querySelector("img[data-new-image]");
+      if (inserted) {
+        inserted.removeAttribute("data-new-image");
+        selectEditorImage(inserted);
+      }
+      syncBodyFieldFromEditor();
       return;
     }
 
@@ -1956,6 +2070,26 @@
 
     headlineHistorySearch?.addEventListener("input", renderHeadlineHistory);
 
+    imageSizeBar?.addEventListener("mousedown", (event) => {
+      // Keep the editor's caret/selection when a size button is pressed.
+      event.preventDefault();
+    });
+    imageSizeBar?.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) {
+        return;
+      }
+
+      event.preventDefault();
+      if (button.dataset.imageAction === "remove") {
+        removeSelectedImage();
+      } else if (button.dataset.imageAction === "done") {
+        clearEditorImageSelection();
+      } else if ("imageSize" in button.dataset) {
+        setSelectedImageSize(button.dataset.imageSize);
+      }
+    });
+
     if (editorToolbar) {
       editorToolbar.addEventListener("click", async (event) => {
         const button = event.target.closest("button[data-editor-action]");
@@ -1972,6 +2106,23 @@
       field.bodyEditor.addEventListener("input", () => {
         field.body.value = stripLegacyTickerParagraphFromBody(field.bodyEditor.innerHTML || "");
         writeDraftToStorage();
+      });
+      field.bodyEditor.addEventListener("click", (event) => {
+        const image = event.target instanceof HTMLImageElement ? event.target : null;
+        if (image) {
+          selectEditorImage(image);
+        } else if (selectedEditorImage) {
+          clearEditorImageSelection();
+        }
+      });
+      field.bodyEditor.addEventListener("keydown", (event) => {
+        const image = getSelectedEditorImage();
+        if (image && (event.key === "Delete" || event.key === "Backspace")) {
+          event.preventDefault();
+          removeSelectedImage();
+        } else if (image && event.key === "Escape") {
+          clearEditorImageSelection();
+        }
       });
       field.bodyEditor.addEventListener("mouseup", updateTableActionState);
       field.bodyEditor.addEventListener("keyup", updateTableActionState);

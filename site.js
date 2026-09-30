@@ -751,6 +751,27 @@
   // editor when an article is saved, so articles saved going forward
   // arrive here already in this shape — this pass is mainly a safety net
   // for older articles saved before that existed.
+  // Photo size presets chosen in the admin editor. Stored as a class on the
+  // <img> (not an inline style) because the article page strips style
+  // attributes. Any class not in this list is dropped by the sanitizer.
+  const IMAGE_SIZE_CLASSES = ["img-size-small", "img-size-medium", "img-size-large", "img-size-full"];
+
+  const sanitizeBuildCleanImage = (source) => {
+    const src = source.getAttribute("src") || "";
+    if (!src) {
+      return null;
+    }
+    const clean = document.createElement("img");
+    clean.setAttribute("src", src);
+    clean.setAttribute("alt", source.getAttribute("alt") || "");
+    clean.className = "editor-image";
+    const size = IMAGE_SIZE_CLASSES.find((name) => source.classList.contains(name));
+    if (size) {
+      clean.classList.add(size);
+    }
+    return clean;
+  };
+
   const SANITIZE_INLINE_MARKS = { strong: "strong", b: "strong", em: "em", i: "em", u: "u", s: "s", strike: "s", del: "s" };
   const SANITIZE_BLOCK_BOUNDARY_TAGS = new Set(["p", "div", "section", "article", "blockquote", "header", "footer", "figure"]);
   const LEGACY_TICKER_ATTR = "data-wormburner-ticker";
@@ -798,12 +819,8 @@
       }
 
       if (tag === "img") {
-        const src = child.getAttribute("src") || "";
-        if (src) {
-          const clean = document.createElement("img");
-          clean.setAttribute("src", src);
-          clean.setAttribute("alt", child.getAttribute("alt") || "");
-          clean.className = "editor-image";
+        const clean = sanitizeBuildCleanImage(child);
+        if (clean) {
           container.appendChild(clean);
         }
         return;
@@ -891,7 +908,7 @@
       .forEach((li) => {
         const cleanLi = document.createElement("li");
         sanitizeWalkInlineChildrenInto(li, cleanLi);
-        if (cleanLi.textContent.trim()) {
+        if (cleanLi.textContent.trim() || cleanLi.querySelector("img")) {
           clean.appendChild(cleanLi);
         }
       });
@@ -908,7 +925,8 @@
         return currentParagraph;
       },
       flush() {
-        if (currentParagraph && currentParagraph.textContent.replace(/ /g, " ").trim() !== "") {
+        // Keep image-only paragraphs: the Photo button inserts <p><img></p>.
+        if (currentParagraph && (currentParagraph.textContent.replace(/\u00a0/g, " ").trim() !== "" || currentParagraph.querySelector("img"))) {
           output.appendChild(currentParagraph);
         }
         currentParagraph = null;
@@ -958,12 +976,8 @@
     }
 
     if (tag === "img") {
-      const src = node.getAttribute("src") || "";
-      if (src) {
-        const clean = document.createElement("img");
-        clean.setAttribute("src", src);
-        clean.setAttribute("alt", node.getAttribute("alt") || "");
-        clean.className = "editor-image";
+      const clean = sanitizeBuildCleanImage(node);
+      if (clean) {
         state.getParagraph().appendChild(clean);
       }
       return;

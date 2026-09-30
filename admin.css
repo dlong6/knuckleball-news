@@ -334,7 +334,58 @@
   max-width: 100%;
   height: auto;
   display: block;
-  margin: 0.5rem 0;
+  margin: 0.5rem auto;
+  cursor: pointer;
+}
+
+/* Photo size presets (mirrors styles.css so the editor matches the site). */
+.editor-surface img.img-size-small { width: 33%; }
+.editor-surface img.img-size-medium { width: 50%; }
+.editor-surface img.img-size-large { width: 75%; }
+.editor-surface img.img-size-full { width: 100%; }
+
+.editor-surface img.is-selected {
+  outline: 3px solid #3465a4;
+  outline-offset: 2px;
+}
+
+.image-size-bar {
+  border: 1px solid #d9e1ea;
+  border-top: 0;
+  background: #eef4fb;
+  padding: 0.42rem 0.45rem 0.45rem;
+}
+
+.image-size-bar[hidden] {
+  display: none;
+}
+
+.image-size-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+}
+
+.image-size-actions button {
+  padding: 0.42rem 0.52rem;
+  font-size: 0.62rem;
+}
+
+.image-size-actions button[aria-pressed="true"] {
+  background: #1f3f66;
+  box-shadow: inset 0 0 0 2px #eff4fa;
+}
+
+.image-size-actions .image-size-remove {
+  margin-left: auto;
+  background: #fff;
+  color: #9b2c2c;
+  border-color: #9b2c2c;
+}
+
+.image-size-actions .image-size-done {
+  background: #fff;
+  color: #1f3f66;
 }
 
 button {

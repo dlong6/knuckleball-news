@@ -1454,3 +1454,16 @@ a.tag-chip:hover {
   height: auto;
   margin: 1rem auto;
 }
+
+/* Photo size presets chosen in the admin editor. */
+.post-body img.img-size-small { width: 33%; }
+.post-body img.img-size-medium { width: 50%; }
+.post-body img.img-size-large { width: 75%; }
+.post-body img.img-size-full { width: 100%; }
+
+/* On phones, small photos get a bit bigger and medium/large fill the column. */
+@media (max-width: 640px) {
+  .post-body img.img-size-small { width: 50%; }
+  .post-body img.img-size-medium,
+  .post-body img.img-size-large { width: 100%; }
+}
